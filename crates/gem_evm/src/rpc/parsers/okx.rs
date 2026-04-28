@@ -269,6 +269,7 @@ mod tests {
                 ),
             ],
             status: "0x1".to_string(),
+            block_hash: "0x1111111111111111111111111111111111111111111111111111111111111111".to_string(),
             block_number: BigUint::from(1u32),
         };
         let transfer_swap_tx = map_transaction(&Chain::Base, &transfer_tx, &transfer_receipt, None);
@@ -312,6 +313,7 @@ mod tests {
                 transaction_hash: None,
             }],
             status: "0x1".to_string(),
+            block_hash: "0x1111111111111111111111111111111111111111111111111111111111111111".to_string(),
             block_number: BigUint::from(24717134u32),
         };
         let uniswap_v3_swap_to = map_transaction(&Chain::Ethereum, &uniswap_v3_swap_to_tx, &uniswap_v3_swap_to_receipt, None);
@@ -352,6 +354,7 @@ mod tests {
                 transaction_hash: None,
             }],
             status: "0x1".to_string(),
+            block_hash: "0x1111111111111111111111111111111111111111111111111111111111111111".to_string(),
             block_number: BigUint::from(24717121u32),
         };
         let unxswap_by_order_id = map_transaction(&Chain::Ethereum, &unxswap_by_order_id_tx, &unxswap_by_order_id_receipt, None);

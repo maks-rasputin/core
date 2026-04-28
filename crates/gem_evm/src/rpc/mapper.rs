@@ -440,6 +440,7 @@ mod tests {
                 transaction_hash: None,
             }],
             status: "0x1".to_string(),
+            block_hash: "0x1111111111111111111111111111111111111111111111111111111111111111".to_string(),
             block_number: BigUint::from(0x1234u32),
         };
 
@@ -503,6 +504,7 @@ mod tests {
             l1_fee: None,
             logs: vec![],
             status: "0x1".to_string(),
+            block_hash: "0x1111111111111111111111111111111111111111111111111111111111111111".to_string(),
             block_number: BigUint::from(1000u32),
         };
 

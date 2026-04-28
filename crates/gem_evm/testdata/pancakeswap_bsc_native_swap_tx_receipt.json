@@ -2,6 +2,7 @@
   "jsonrpc": "2.0",
   "id": 1,
   "result": {
+    "blockHash": "0x1111111111111111111111111111111111111111111111111111111111111111",
     "gasUsed": "0x34185",
     "effectiveGasPrice": "0x2faf080",
     "logs": [

@@ -1,5 +1,6 @@
 use num_bigint::BigUint;
-use primitives::TransactionState;
+use num_traits::Zero;
+use primitives::{TransactionState, contract_constants::EVM_ZERO_BLOCK_HASH};
 use serde::{Deserialize, Serialize};
 use serde_serializers::{deserialize_biguint_from_hex_str, deserialize_biguint_from_option_hex_str, deserialize_u64_from_str_or_int};
 use std::collections::HashMap;
@@ -67,6 +68,7 @@ pub struct TransactionReciept {
     pub l1_fee: Option<BigUint>,
     pub logs: Vec<Log>,
     pub status: String,
+    pub block_hash: String,
     #[serde(default, deserialize_with = "deserialize_biguint_from_hex_str")]
     pub block_number: BigUint,
 }
@@ -80,7 +82,15 @@ impl TransactionReciept {
         fee
     }
 
+    pub fn has_valid_block_reference(&self) -> bool {
+        !self.block_number.is_zero() && self.block_hash != EVM_ZERO_BLOCK_HASH
+    }
+
     pub fn get_state(&self) -> TransactionState {
+        if !self.has_valid_block_reference() {
+            return TransactionState::Pending;
+        }
+
         match self.status.as_str() {
             "0x1" => TransactionState::Confirmed,
             "0x0" => TransactionState::Reverted,
