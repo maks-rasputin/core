@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, HashMap};
 use number_formatter::{BigNumberFormatter, NumberFormatterError};
 use primitives::currency::Currency;
 use primitives::fiat_assets::FiatAssetLimits;
-use primitives::{Chain, FiatTransactionStatus, FiatTransactionUpdate, PaymentType};
+use primitives::{Asset, Chain, FiatTransactionStatus, FiatTransactionUpdate, PaymentType};
 use streamer::FiatWebhook;
 
 use crate::model::{FiatProviderAsset, filter_token_id};
@@ -47,6 +47,9 @@ fn map_asset(route: FlashnetRoute) -> Option<FiatProviderAsset> {
     let chain = map_chain(&destination.chain)?;
     let token_id = filter_token_id(Some(chain), destination.contract_address);
     let symbol = destination.asset;
+    if token_id.is_none() && symbol != Asset::from_chain(chain).symbol {
+        return None;
+    }
     let network = destination.chain;
 
     Some(FiatProviderAsset {
@@ -208,6 +211,51 @@ mod tests {
         assert_eq!(assets.len(), 2);
         assert_eq!(assets[0].id, "usdc_base");
         assert_eq!(assets[1].id, "usdc_solana");
+    }
+
+    #[test]
+    fn map_assets_ignores_non_native_null_contract_assets() {
+        let routes = vec![
+            FlashnetRoute {
+                source_chain: "lightning".to_string(),
+                source_asset: "BTC".to_string(),
+                destination: FlashnetRouteAsset {
+                    chain: "solana".to_string(),
+                    asset: "SOL".to_string(),
+                    contract_address: None,
+                },
+            },
+            FlashnetRoute {
+                source_chain: "lightning".to_string(),
+                source_asset: "BTC".to_string(),
+                destination: FlashnetRouteAsset {
+                    chain: "solana".to_string(),
+                    asset: "HSUSD".to_string(),
+                    contract_address: None,
+                },
+            },
+            FlashnetRoute {
+                source_chain: "lightning".to_string(),
+                source_asset: "BTC".to_string(),
+                destination: FlashnetRouteAsset {
+                    chain: "solana".to_string(),
+                    asset: "USDC".to_string(),
+                    contract_address: Some("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v".to_string()),
+                },
+            },
+        ];
+
+        let assets = map_assets(routes);
+        let ids = assets.iter().map(|asset| asset.id.as_str()).collect::<Vec<_>>();
+        let solana = assets.iter().find(|asset| asset.id == "sol_solana").unwrap();
+        let usdc = assets.iter().find(|asset| asset.id == "usdc_solana").unwrap();
+
+        assert_eq!(ids, vec!["sol_solana", "usdc_solana"]);
+        assert_eq!(solana.asset_id(), Some(primitives::AssetId::from_chain(Chain::Solana)));
+        assert_eq!(
+            usdc.asset_id(),
+            Some(primitives::AssetId::from_token(Chain::Solana, "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"))
+        );
     }
 
     #[test]
