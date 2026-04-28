@@ -38,7 +38,7 @@ pub struct MonadLensBalance {
     pub rewards: BigUint,
 }
 
-pub(crate) fn delegation_id(address: &str, validator_id: u64, state: DelegationState, withdraw_id: u8) -> String {
+pub fn delegation_id(address: &str, validator_id: u64, state: DelegationState, withdraw_id: u8) -> String {
     format!("{}:{}:{}:{}", address, validator_id, state.as_ref(), withdraw_id)
 }
 
