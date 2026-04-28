@@ -1,5 +1,7 @@
 use gem_evm::ethereum_address_checksum;
-use primitives::{AssetLink, Chain, LinkType, NFTAsset, NFTAssetId, NFTAttribute, NFTCollectionId, NFTImages, NFTResource, NFTType, VerificationStatus};
+use primitives::{AssetLink, Chain, LinkType, NFTAsset, NFTAssetId, NFTAttribute, NFTAttributeType, NFTCollectionId, NFTImages, NFTResource, NFTType, VerificationStatus};
+
+use crate::providers::attribute::json_attribute_value;
 
 use super::model::{Collection, Nft, NftAsset, NftResponse, NftsResponse, Trait};
 
@@ -72,16 +74,29 @@ impl NftAsset {
 
 impl Trait {
     pub fn as_attribute(&self) -> Option<NFTAttribute> {
-        let value = self.value.as_str()?.to_string();
+        let value = json_attribute_value(&self.value)?;
         if value == "None" {
             return None;
         }
-        Some(NFTAttribute {
-            name: self.trait_type.clone(),
-            value,
-            percentage: None,
-        })
+        let value_type = self.attribute_type(&value);
+        Some(NFTAttribute::new(self.trait_type.clone(), value, value_type))
     }
+
+    fn attribute_type(&self, value: &str) -> NFTAttributeType {
+        if self.display_type.as_deref().is_some_and(|display_type| display_type.eq_ignore_ascii_case("date")) || self.has_date_name() && is_unix_seconds(value) {
+            return NFTAttributeType::Timestamp;
+        }
+        NFTAttributeType::String
+    }
+
+    fn has_date_name(&self) -> bool {
+        let name = self.trait_type.to_ascii_lowercase();
+        ["date", "expiry", "expires", "expiration"].iter().any(|hint| name.contains(hint))
+    }
+}
+
+fn is_unix_seconds(value: &str) -> bool {
+    (9..=10).contains(&value.len()) && value.bytes().all(|byte| byte.is_ascii_digit())
 }
 
 impl Collection {
@@ -244,5 +259,35 @@ mod tests {
             "https://metadata.ens.domains/mainnet/0xd4416b13d2b3a9abae7acd5d6c2bbdbe25686401/0x94113a45c5bedf735911bf707d70a6c05d9d99e76ece7e904c0eeda6591785b6/image"
         );
         assert_eq!(nft_asset.images.preview.url, nft_asset.resource.url);
+
+        let length = nft_asset.attributes.iter().find(|attr| attr.name == "Length").unwrap();
+        assert_eq!(length.value_type, Some(NFTAttributeType::String));
+
+        let created_date = nft_asset.attributes.iter().find(|attr| attr.name == "Created Date").unwrap();
+        assert_eq!(created_date.value_type, Some(NFTAttributeType::Timestamp));
+    }
+
+    #[test]
+    fn test_map_ens_date_attributes() {
+        let response: NftResponse = serde_json::from_str(include_str!("../../../testdata/opensea/asset_ens_dates.json")).unwrap();
+        let asset_id = NFTAssetId::new(
+            Chain::Ethereum,
+            "0xd4416b13d2b3a9abae7acd5d6c2bbdbe25686401",
+            "91780768891665961085574300632320337237649359513314798633242628975887494917390",
+        );
+
+        let nft_asset = map_asset(response, asset_id).unwrap();
+
+        let length = nft_asset.attributes.iter().find(|attr| attr.name == "Length").unwrap();
+        assert_eq!(length.value, "9");
+        assert_eq!(length.value_type, Some(NFTAttributeType::String));
+
+        let created_date = nft_asset.attributes.iter().find(|attr| attr.name == "Created Date").unwrap();
+        assert_eq!(created_date.value, "1738102775");
+        assert_eq!(created_date.value_type, Some(NFTAttributeType::Timestamp));
+
+        let expiry_date = nft_asset.attributes.iter().find(|attr| attr.name == "Namewrapper Expiry Date").unwrap();
+        assert_eq!(expiry_date.value, "1872109175");
+        assert_eq!(expiry_date.value_type, Some(NFTAttributeType::Timestamp));
     }
 }

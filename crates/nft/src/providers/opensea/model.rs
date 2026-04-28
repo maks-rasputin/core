@@ -46,6 +46,7 @@ pub struct Nft {
 #[derive(Deserialize, Clone, Debug)]
 pub struct Trait {
     pub trait_type: String,
+    pub display_type: Option<String>,
     pub value: serde_json::Value,
 }
 

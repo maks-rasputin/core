@@ -1,4 +1,6 @@
-use primitives::{Chain, LinkType, NFTAsset, NFTAssetId, NFTAttribute, NFTCollectionId, NFTImages, NFTResource, NFTType, VerificationStatus};
+use primitives::{Chain, LinkType, NFTAsset, NFTAssetId, NFTAttribute, NFTAttributeType, NFTCollectionId, NFTImages, NFTResource, NFTType, VerificationStatus};
+
+use crate::providers::attribute::json_attribute_value;
 
 use super::model::{Collection, Nft, Trait};
 
@@ -41,12 +43,8 @@ impl Nft {
 
 impl Trait {
     pub fn as_attribute(&self) -> Option<NFTAttribute> {
-        let value = self.value.as_str()?.to_string();
-        Some(NFTAttribute {
-            name: self.trait_type.clone(),
-            value,
-            percentage: None,
-        })
+        let value = json_attribute_value(&self.value)?;
+        Some(NFTAttribute::new(self.trait_type.clone(), value, NFTAttributeType::String))
     }
 }
 

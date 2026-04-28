@@ -1,3 +1,4 @@
+mod attribute;
 pub mod magiceden;
 pub mod opensea;
 pub mod ton;

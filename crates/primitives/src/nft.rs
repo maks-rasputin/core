@@ -190,7 +190,7 @@ impl AsRef<str> for NFTAssetId {
 
 impl fmt::Display for NFTAssetId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.as_ref())
+        write!(f, "{}{CHAIN_SEPARATOR}{}{TOKEN_ID_SEPARATOR}{}", self.chain.as_ref(), self.contract_address, self.token_id)
     }
 }
 
@@ -222,13 +222,35 @@ pub struct NFTImages {
     pub preview: NFTResource,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
+#[typeshare(swift = "Sendable, Hashable, Equatable")]
+#[serde(rename_all = "lowercase")]
+pub enum NFTAttributeType {
+    String,
+    Timestamp,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[typeshare(swift = "Sendable, Hashable, Equatable")]
 pub struct NFTAttribute {
     pub name: String,
     pub value: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value_type: Option<NFTAttributeType>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub percentage: Option<f64>,
+}
+
+impl NFTAttribute {
+    pub fn new(name: impl Into<String>, value: impl Into<String>, value_type: NFTAttributeType) -> Self {
+        Self {
+            name: name.into(),
+            value: value.into(),
+            value_type: Some(value_type),
+            percentage: None,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash, EnumIter, AsRefStr, EnumString)]
@@ -306,6 +328,7 @@ mod tests {
     fn test_asset_id() {
         let eth = NFTAssetId::new(Chain::Ethereum, "0xabc", "42");
         assert_eq!(eth.as_ref(), "ethereum_0xabc::42");
+        assert_eq!(eth.to_string(), "ethereum_0xabc::42");
         assert_eq!(NFTAssetId::from_id("ethereum_0xabc::42"), Some(eth));
 
         let ton = NFTAssetId::new(Chain::Ton, TON_COLLECTION, TON_TOKEN);
@@ -316,5 +339,26 @@ mod tests {
         assert_eq!(NFTAssetId::from_id("ethereum_0xabc"), None);
         assert_eq!(NFTAssetId::from_id("nonsense"), None);
         assert_eq!(NFTAssetId::from_id("ton_short"), None);
+    }
+
+    #[test]
+    fn test_nft_attribute_skips_empty_optional_fields() {
+        let value = serde_json::to_value(NFTAttribute {
+            name: "Length".to_string(),
+            value: "9".to_string(),
+            value_type: None,
+            percentage: None,
+        })
+        .unwrap();
+        assert_eq!(
+            value,
+            serde_json::json!({
+                "name": "Length",
+                "value": "9"
+            })
+        );
+
+        let value = serde_json::to_value(NFTAttribute::new("Created Date", "1738102775", NFTAttributeType::Timestamp)).unwrap();
+        assert_eq!(value["valueType"], "timestamp");
     }
 }

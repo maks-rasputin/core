@@ -7,11 +7,14 @@ pub trait NftRepository {
     fn get_nft_assets_by_filter(&mut self, filters: Vec<NftAssetFilter>) -> Result<Vec<NftAssetRow>, DatabaseError>;
     fn get_nft_asset(&mut self, identifier: &str) -> Result<NftAssetRow, DatabaseError>;
     fn add_nft_assets(&mut self, values: Vec<NewNftAssetRow>) -> Result<usize, DatabaseError>;
+    fn upsert_nft_asset(&mut self, value: NewNftAssetRow) -> Result<NftAssetRow, DatabaseError>;
     fn get_nft_collections_by_filter(&mut self, filters: Vec<NftCollectionFilter>) -> Result<Vec<NftCollectionRow>, DatabaseError>;
     fn get_nft_collection(&mut self, identifier: &str) -> Result<NftCollectionRow, DatabaseError>;
     fn get_nft_collection_links(&mut self, collection_id: i32) -> Result<Vec<NftLinkRow>, DatabaseError>;
     fn add_nft_collections(&mut self, values: Vec<NewNftCollectionRow>) -> Result<usize, DatabaseError>;
+    fn upsert_nft_collection(&mut self, value: NewNftCollectionRow) -> Result<NftCollectionRow, DatabaseError>;
     fn add_nft_collections_links(&mut self, values: Vec<NftLinkRow>) -> Result<usize, DatabaseError>;
+    fn set_nft_collection_links(&mut self, collection_id: i32, values: Vec<NftLinkRow>) -> Result<usize, DatabaseError>;
     fn add_nft_report(&mut self, report: NewNftReportRow) -> Result<usize, DatabaseError>;
     fn set_nft_asset_associations(&mut self, address_id: i32, chains: Vec<Chain>, asset_ids: Vec<i32>) -> Result<(), DatabaseError>;
 }
@@ -27,6 +30,10 @@ impl NftRepository for DatabaseClient {
 
     fn add_nft_assets(&mut self, values: Vec<NewNftAssetRow>) -> Result<usize, DatabaseError> {
         Ok(NftStore::add_nft_assets(self, values)?)
+    }
+
+    fn upsert_nft_asset(&mut self, value: NewNftAssetRow) -> Result<NftAssetRow, DatabaseError> {
+        Ok(NftStore::upsert_nft_asset(self, value)?)
     }
 
     fn get_nft_collections_by_filter(&mut self, filters: Vec<NftCollectionFilter>) -> Result<Vec<NftCollectionRow>, DatabaseError> {
@@ -45,8 +52,16 @@ impl NftRepository for DatabaseClient {
         Ok(NftStore::add_nft_collections(self, values)?)
     }
 
+    fn upsert_nft_collection(&mut self, value: NewNftCollectionRow) -> Result<NftCollectionRow, DatabaseError> {
+        Ok(NftStore::upsert_nft_collection(self, value)?)
+    }
+
     fn add_nft_collections_links(&mut self, values: Vec<NftLinkRow>) -> Result<usize, DatabaseError> {
         Ok(NftStore::add_nft_collections_links(self, values)?)
+    }
+
+    fn set_nft_collection_links(&mut self, collection_id: i32, values: Vec<NftLinkRow>) -> Result<usize, DatabaseError> {
+        Ok(NftStore::set_nft_collection_links(self, collection_id, values)?)
     }
 
     fn add_nft_report(&mut self, report: NewNftReportRow) -> Result<usize, DatabaseError> {

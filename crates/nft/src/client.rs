@@ -4,7 +4,7 @@ use std::error::Error;
 use primitives::{AssetId, Chain, ImageFormatter, NFTAsset, NFTAssetId, NFTCollection, NFTCollectionId, NFTData};
 use storage::database::devices::DevicesStore;
 use storage::database::nft::{NftAssetFilter, NftCollectionFilter};
-use storage::models::{NewNftAssetRow, NewNftCollectionRow, NftLinkRow};
+use storage::models::{NewNftAssetRow, NewNftCollectionRow, NftCollectionRow, NftLinkRow};
 use storage::{Database, NftRepository, WalletsRepository};
 
 use crate::NFTProviderConfig;
@@ -29,12 +29,30 @@ impl NFTClient {
         Self::new(database, NFTProviderClient::new(config), assets_url)
     }
 
-    pub async fn update_collection(&self, _collection_id: &str) -> Result<bool, Box<dyn Error + Send + Sync>> {
+    pub async fn update_collection(&self, collection_id: &str) -> Result<bool, Box<dyn Error + Send + Sync>> {
+        let collection_id = NFTCollectionId::from_id(collection_id).ok_or_else(|| format!("invalid NFT collection id: {}", collection_id))?;
+        self.refresh_collection(collection_id).await?;
         Ok(true)
     }
 
-    pub async fn update_asset(&self, _asset_id: &str) -> Result<bool, Box<dyn Error + Send + Sync>> {
+    pub async fn update_asset(&self, asset_id: &str) -> Result<bool, Box<dyn Error + Send + Sync>> {
+        let asset_id = NFTAssetId::from_id(asset_id).ok_or_else(|| format!("invalid NFT asset id: {}", asset_id))?;
+        self.refresh_asset(asset_id).await?;
         Ok(true)
+    }
+
+    pub async fn refresh_collection(&self, collection_id: NFTCollectionId) -> Result<NFTCollection, Box<dyn Error + Send + Sync>> {
+        let collection = self.provider_client.get_nft_collection(collection_id).await?;
+        self.upsert_collection(collection.clone())?;
+        Ok(self.with_urls_collection(collection))
+    }
+
+    pub async fn refresh_asset(&self, asset_id: NFTAssetId) -> Result<(), Box<dyn Error + Send + Sync>> {
+        let collection = self.provider_client.get_nft_collection(asset_id.get_collection_id()).await?;
+        let collection_row = self.upsert_collection(collection)?;
+        let asset = self.provider_client.get_nft_asset(asset_id).await?;
+        self.database.nft()?.upsert_nft_asset(NewNftAssetRow::from_primitive(asset, collection_row.id))?;
+        Ok(())
     }
 
     pub async fn get_nft_assets_by_wallet_id(&self, device_id: i32, wallet_id: i32) -> Result<Vec<NFTData>, Box<dyn Error + Send + Sync>> {
@@ -90,6 +108,18 @@ impl NFTClient {
             collection: self.with_urls_collection(data.collection),
             assets: data.assets.into_iter().map(|a| self.with_urls_asset(a)).collect(),
         }
+    }
+
+    fn upsert_collection(&self, collection: NFTCollection) -> Result<NftCollectionRow, Box<dyn Error + Send + Sync>> {
+        let row = self.database.nft()?.upsert_nft_collection(NewNftCollectionRow::from_primitive(collection.clone()))?;
+        let links: Vec<NftLinkRow> = collection
+            .links
+            .into_iter()
+            .filter(|link| !link.url.is_empty())
+            .map(|link| NftLinkRow::from_primitive(row.id, link))
+            .collect();
+        self.database.nft()?.set_nft_collection_links(row.id, links)?;
+        Ok(row)
     }
 
     pub async fn preload(&self, assets: Vec<NFTAssetId>) -> Result<Vec<NFTData>, Box<dyn Error + Send + Sync>> {

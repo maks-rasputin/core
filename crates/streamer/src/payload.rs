@@ -1,6 +1,6 @@
 use primitives::{
-    AssetAddress, AssetId, Chain, ChainAddress, FailedNotification, FiatProviderName, FiatTransactionUpdate, GorushNotification, NotificationType, PriceData, PriceId, Transaction,
-    TransactionId,
+    AssetAddress, AssetId, Chain, ChainAddress, FailedNotification, FiatProviderName, FiatTransactionUpdate, GorushNotification, NFTAssetId, NotificationType, PriceData, PriceId,
+    Transaction, TransactionId,
 };
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -148,21 +148,19 @@ impl fmt::Display for FetchNFTCollectionPayload {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FetchNFTCollectionAssetPayload {
-    pub chain: Chain,
-    pub collection_id: String,
-    pub asset_id: String,
+pub struct FetchNFTAssetPayload {
+    pub asset_id: NFTAssetId,
 }
 
-impl FetchNFTCollectionAssetPayload {
-    pub fn new(chain: Chain, collection_id: String, asset_id: String) -> Self {
-        Self { chain, collection_id, asset_id }
+impl FetchNFTAssetPayload {
+    pub fn new(asset_id: NFTAssetId) -> Self {
+        Self { asset_id }
     }
 }
 
-impl fmt::Display for FetchNFTCollectionAssetPayload {
+impl fmt::Display for FetchNFTAssetPayload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "chain={}, collection_id={}, asset_id={}", self.chain.as_ref(), self.collection_id, self.asset_id)
+        write!(f, "asset_id={}", self.asset_id)
     }
 }
 

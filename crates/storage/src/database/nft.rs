@@ -32,11 +32,14 @@ pub(crate) trait NftStore {
     fn get_nft_assets_by_filter(&mut self, filters: Vec<NftAssetFilter>) -> Result<Vec<NftAssetRow>, diesel::result::Error>;
     fn get_nft_asset(&mut self, identifier: &str) -> Result<NftAssetRow, diesel::result::Error>;
     fn add_nft_assets(&mut self, values: Vec<NewNftAssetRow>) -> Result<usize, diesel::result::Error>;
+    fn upsert_nft_asset(&mut self, value: NewNftAssetRow) -> Result<NftAssetRow, diesel::result::Error>;
     fn get_nft_collections_by_filter(&mut self, filters: Vec<NftCollectionFilter>) -> Result<Vec<NftCollectionRow>, diesel::result::Error>;
     fn get_nft_collection(&mut self, identifier: &str) -> Result<NftCollectionRow, diesel::result::Error>;
     fn get_nft_collection_links(&mut self, collection_id: i32) -> Result<Vec<NftLinkRow>, diesel::result::Error>;
     fn add_nft_collections(&mut self, values: Vec<NewNftCollectionRow>) -> Result<usize, diesel::result::Error>;
+    fn upsert_nft_collection(&mut self, value: NewNftCollectionRow) -> Result<NftCollectionRow, diesel::result::Error>;
     fn add_nft_collections_links(&mut self, values: Vec<NftLinkRow>) -> Result<usize, diesel::result::Error>;
+    fn set_nft_collection_links(&mut self, collection_id: i32, values: Vec<NftLinkRow>) -> Result<usize, diesel::result::Error>;
     fn add_nft_report(&mut self, report: NewNftReportRow) -> Result<usize, diesel::result::Error>;
     fn get_nft_asset_association_ids_by_filter(&mut self, filters: Vec<NftAssetAssociationFilter>) -> Result<Vec<i32>, diesel::result::Error>;
     fn add_nft_asset_associations(&mut self, values: Vec<NewNftAssetAssociationRow>) -> Result<usize, diesel::result::Error>;
@@ -76,6 +79,17 @@ impl NftStore for DatabaseClient {
         diesel::insert_into(nft_assets).values(values).on_conflict_do_nothing().execute(&mut self.connection)
     }
 
+    fn upsert_nft_asset(&mut self, value: NewNftAssetRow) -> Result<NftAssetRow, diesel::result::Error> {
+        use crate::schema::nft_assets::dsl::*;
+        diesel::insert_into(nft_assets)
+            .values(&value)
+            .on_conflict(identifier)
+            .do_update()
+            .set(&value)
+            .returning(NftAssetRow::as_returning())
+            .get_result(&mut self.connection)
+    }
+
     fn get_nft_collections_by_filter(&mut self, filters: Vec<NftCollectionFilter>) -> Result<Vec<NftCollectionRow>, diesel::result::Error> {
         use crate::schema::nft_collections::dsl::*;
         let mut query = nft_collections.into_boxed();
@@ -110,6 +124,17 @@ impl NftStore for DatabaseClient {
         diesel::insert_into(nft_collections).values(values).on_conflict_do_nothing().execute(&mut self.connection)
     }
 
+    fn upsert_nft_collection(&mut self, value: NewNftCollectionRow) -> Result<NftCollectionRow, diesel::result::Error> {
+        use crate::schema::nft_collections::dsl::*;
+        diesel::insert_into(nft_collections)
+            .values(&value)
+            .on_conflict(identifier)
+            .do_update()
+            .set(&value)
+            .returning(NftCollectionRow::as_returning())
+            .get_result(&mut self.connection)
+    }
+
     fn add_nft_collections_links(&mut self, values: Vec<NftLinkRow>) -> Result<usize, diesel::result::Error> {
         use crate::schema::nft_collections_links::dsl::*;
         diesel::insert_into(nft_collections_links)
@@ -117,6 +142,15 @@ impl NftStore for DatabaseClient {
             .on_conflict((collection_id, link_type))
             .do_nothing()
             .execute(&mut self.connection)
+    }
+
+    fn set_nft_collection_links(&mut self, collection_row_id: i32, values: Vec<NftLinkRow>) -> Result<usize, diesel::result::Error> {
+        use crate::schema::nft_collections_links::dsl::*;
+        diesel::delete(nft_collections_links.filter(collection_id.eq(collection_row_id))).execute(&mut self.connection)?;
+        if values.is_empty() {
+            return Ok(0);
+        }
+        self.add_nft_collections_links(values)
     }
 
     fn add_nft_report(&mut self, report: NewNftReportRow) -> Result<usize, diesel::result::Error> {

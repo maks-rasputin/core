@@ -1,11 +1,18 @@
 use primitives::Chain;
-use primitives::nft::{NFTAsset, NFTAttribute, NFTImages, NFTResource, NFTType};
+use primitives::nft::{NFTAsset, NFTAttribute, NFTAttributeType, NFTImages, NFTResource, NFTType};
 
 pub type GemNFTAttribute = NFTAttribute;
+pub type GemNFTAttributeType = NFTAttributeType;
 pub type GemNFTType = NFTType;
 pub type GemNFTResource = NFTResource;
 pub type GemNFTImages = NFTImages;
 pub type GemNFTAsset = NFTAsset;
+
+#[uniffi::remote(Enum)]
+pub enum GemNFTAttributeType {
+    String,
+    Timestamp,
+}
 
 #[uniffi::remote(Enum)]
 pub enum GemNFTType {
@@ -30,6 +37,7 @@ pub struct GemNFTImages {
 pub struct GemNFTAttribute {
     pub name: String,
     pub value: String,
+    pub value_type: Option<GemNFTAttributeType>,
     pub percentage: Option<f64>,
 }
 

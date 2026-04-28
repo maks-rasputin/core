@@ -6,7 +6,9 @@ pub mod error;
 pub mod guard;
 pub mod signature;
 use crate::assets::AssetsClient;
-use crate::params::{AssetIdParam, ChainParam, ChartPeriodParam, CurrencyParam, DeviceParam, FiatProviderIdParam, FiatQuoteTypeParam, TransactionIdParam, UserAgent};
+use crate::params::{
+    AssetIdParam, ChainParam, ChartPeriodParam, CurrencyParam, DeviceParam, FiatProviderIdParam, FiatQuoteTypeParam, NftAssetIdParam, TransactionIdParam, UserAgent,
+};
 use crate::responders::{ApiError, ApiResponse};
 use auth_config::AuthConfig;
 pub use client::DevicesClient;
@@ -29,6 +31,7 @@ use primitives::{
 };
 use rocket::{State, delete, get, post, put, serde::json::Json, tokio::sync::Mutex};
 use std::sync::Arc;
+use streamer::{StreamProducer, StreamProducerQueue};
 
 use crate::auth::WalletSigned;
 
@@ -96,6 +99,15 @@ pub async fn get_device_address_names_v2(
 #[get("/devices/nft_assets")]
 pub async fn get_device_nft_assets_v2(device: AuthenticatedDeviceWallet, client: &State<NFTClient>) -> Result<ApiResponse<Vec<NFTData>>, ApiError> {
     Ok(client.get_nft_assets_by_wallet_id(device.device_row.id, device.wallet_id).await?.into())
+}
+
+#[post("/devices/nft_assets/<asset_id>/refresh")]
+pub async fn refresh_device_nft_asset_v2(
+    _device: AuthenticatedDeviceWallet,
+    asset_id: NftAssetIdParam,
+    stream_producer: &State<StreamProducer>,
+) -> Result<ApiResponse<bool>, ApiError> {
+    Ok(stream_producer.publish_fetch_nft_asset(asset_id.0).await?.into())
 }
 
 #[get("/devices/rewards")]

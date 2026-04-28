@@ -1,4 +1,5 @@
 const SECONDS_PER_MINUTE: u64 = 60;
+const SECONDS_PER_HOUR: u64 = 60 * SECONDS_PER_MINUTE;
 const SECONDS_PER_DAY: u64 = 24 * 60 * 60;
 
 pub enum CacheKey<'a> {
@@ -22,6 +23,7 @@ pub enum CacheKey<'a> {
 
     // Asset keys
     FetchAssets(&'a str),
+    FetchNftAsset(&'a str),
     Price(&'a str),
     PricerCoinInfo(&'a str),
 
@@ -79,6 +81,7 @@ impl CacheKey<'_> {
             Self::FetchNftAssetsAddresses(chain, address) => format!("fetch:nft_assets_addresses:{}:{}", chain, address),
             Self::FetchAddressTransactions(chain, address) => format!("fetch:address_transactions:{}:{}", chain, address),
             Self::FetchAssets(asset_id) => format!("fetch:assets:{}", asset_id),
+            Self::FetchNftAsset(asset_id) => format!("fetch:nft_asset:{}", asset_id),
             Self::Price(asset_id) => format!("prices:{}", asset_id),
             Self::PricerCoinInfo(coin_id) => format!("pricer:coin_info:{}", coin_id),
             Self::FiatRates => "fiat:rates".to_string(),
@@ -115,6 +118,7 @@ impl CacheKey<'_> {
             Self::FetchNftAssetsAddresses(_, _) => 30 * SECONDS_PER_DAY,
             Self::FetchAddressTransactions(_, _) => 30 * SECONDS_PER_DAY,
             Self::FetchAssets(_) => 30 * SECONDS_PER_DAY,
+            Self::FetchNftAsset(_) => SECONDS_PER_HOUR,
             Self::Price(_) => 30 * SECONDS_PER_DAY,
             Self::PricerCoinInfo(_) => SECONDS_PER_DAY,
             Self::FiatRates => SECONDS_PER_DAY,
