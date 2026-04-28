@@ -18,12 +18,14 @@ pub async fn update_nft_asset(asset_id: NftAssetIdParam, stream_producer: &State
 
 #[get("/nft/assets/<asset_id>/preview")]
 pub async fn get_nft_asset_preview(asset_id: NftAssetIdParam, client: &State<NFTClient>) -> Result<Json<NFTResource>, ApiError> {
-    Ok(Json(client.load_nft_asset(asset_id.0.as_ref())?.images.preview))
+    let identifier = asset_id.0.to_string();
+    Ok(Json(client.load_nft_asset(&identifier)?.images.preview))
 }
 
 #[get("/nft/assets/<asset_id>/resource")]
 pub async fn get_nft_asset_resource(asset_id: NftAssetIdParam, client: &State<NFTClient>) -> Result<Json<NFTResource>, ApiError> {
-    Ok(Json(client.load_nft_asset(asset_id.0.as_ref())?.resource))
+    let identifier = asset_id.0.to_string();
+    Ok(Json(client.load_nft_asset(&identifier)?.resource))
 }
 
 #[get("/nft/collections/<collection_id>/preview")]

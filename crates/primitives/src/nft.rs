@@ -182,12 +182,6 @@ impl NFTAssetId {
     }
 }
 
-impl AsRef<str> for NFTAssetId {
-    fn as_ref(&self) -> &str {
-        Box::leak(format!("{}{CHAIN_SEPARATOR}{}{TOKEN_ID_SEPARATOR}{}", self.chain.as_ref(), self.contract_address, self.token_id).into_boxed_str())
-    }
-}
-
 impl fmt::Display for NFTAssetId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}{CHAIN_SEPARATOR}{}{TOKEN_ID_SEPARATOR}{}", self.chain.as_ref(), self.contract_address, self.token_id)
@@ -327,13 +321,12 @@ mod tests {
     #[test]
     fn test_asset_id() {
         let eth = NFTAssetId::new(Chain::Ethereum, "0xabc", "42");
-        assert_eq!(eth.as_ref(), "ethereum_0xabc::42");
         assert_eq!(eth.to_string(), "ethereum_0xabc::42");
         assert_eq!(NFTAssetId::from_id("ethereum_0xabc::42"), Some(eth));
 
         let ton = NFTAssetId::new(Chain::Ton, TON_COLLECTION, TON_TOKEN);
-        assert_eq!(ton.as_ref(), format!("ton_{TON_COLLECTION}::{TON_TOKEN}"));
-        assert_eq!(NFTAssetId::from_id(ton.as_ref()), Some(ton.clone()));
+        assert_eq!(ton.to_string(), format!("ton_{TON_COLLECTION}::{TON_TOKEN}"));
+        assert_eq!(NFTAssetId::from_id(&ton.to_string()), Some(ton.clone()));
         assert_eq!(ton.get_collection_id(), NFTCollectionId::new(Chain::Ton, TON_COLLECTION));
 
         assert_eq!(NFTAssetId::from_id("ethereum_0xabc"), None);
