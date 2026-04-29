@@ -18,9 +18,10 @@ use crate::{
     FetchQuoteData, ProviderData, ProviderType, Quote, QuoteRequest, Route, SwapResult, Swapper, SwapperChainAsset, SwapperError, SwapperProvider, SwapperQuoteData,
     alien::RpcProvider,
     amount_to_value,
-    approval::check_approval_erc20,
+    approval::{check_approval_erc20, get_swap_gas_limit_with_approval},
     cross_chain::VaultAddresses,
     fees::{DEFAULT_CHAINFLIP_FEE_BPS, apply_slippage_in_bp, resolve_max_quote_value},
+    solana::DEFAULT_SWAP_GAS_LIMIT,
 };
 use primitives::{ChainType, chain::Chain, swap::QuoteAsset};
 
@@ -300,7 +301,7 @@ where
                     None
                 };
 
-                let gas_limit = if approval.is_some() { Some(DEFAULT_SWAP_ERC20_GAS_LIMIT.to_string()) } else { None };
+                let gas_limit = get_swap_gas_limit_with_approval(&approval, None, DEFAULT_SWAP_ERC20_GAS_LIMIT);
 
                 Ok(SwapperQuoteData::new_contract(response.to, value, response.calldata, approval, gas_limit))
             }
@@ -315,7 +316,13 @@ where
                 let data = tx_builder::build_solana_tx(&quote.request.wallet_address, &response, self.rpc_provider.clone())
                     .await
                     .map_err(SwapperError::TransactionError)?;
-                Ok(SwapperQuoteData::new_contract(response.program_id, "".into(), data, None, None))
+                Ok(SwapperQuoteData::new_contract(
+                    response.program_id,
+                    "".into(),
+                    data,
+                    None,
+                    Some(DEFAULT_SWAP_GAS_LIMIT.to_string()),
+                ))
             }
         }
     }

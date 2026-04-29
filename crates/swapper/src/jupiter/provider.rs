@@ -5,7 +5,7 @@ use super::{
 };
 use crate::{
     FetchQuoteData, Options, ProviderData, ProviderType, Quote, QuoteRequest, Route, Swapper, SwapperChainAsset, SwapperError, SwapperMode, SwapperProvider, SwapperQuoteData,
-    error::INVALID_ADDRESS,
+    error::INVALID_ADDRESS, solana,
 };
 use alloy_primitives::U256;
 use async_trait::async_trait;
@@ -185,12 +185,13 @@ where
             return Err(SwapperError::TransactionError(simulation_error.error));
         }
 
+        let gas_limit = solana::gas_limit_from_transaction(&quote_data.swap_transaction)?;
         Ok(SwapperQuoteData::new_contract(
             PROGRAM_ADDRESS.to_string(),
             "".to_string(),
             quote_data.swap_transaction,
             None,
-            None,
+            Some(gas_limit.to_string()),
         ))
     }
 }
