@@ -10,17 +10,18 @@ pub struct SolanaChainSigner;
 impl ChainSigner for SolanaChainSigner {
     fn sign_swap(&self, input: &SignerInput, private_key: &[u8]) -> Result<Vec<String>, SignerError> {
         let swap_data = input.input_type.get_swap_data().map_err(SignerError::invalid_input)?;
-        let tx_base64 = &swap_data.data.data;
+        let transaction_base64 = &swap_data.data.data;
 
         let unit_price = input.fee.unit_price_u64()?;
         let quote_gas_limit = swap_data
             .data
             .gas_limit
-            .as_deref()
-            .map(|value| value.parse::<u32>().map_err(|_| SignerError::invalid_input("invalid gas_limit")))
-            .transpose()?;
+            .as_ref()
+            .map(|_| swap_data.data.gas_limit_as_u32())
+            .transpose()
+            .map_err(SignerError::invalid_input)?;
 
-        let signed = Self::sign_transaction(tx_base64, private_key, unit_price, quote_gas_limit, &input.fee)?;
+        let signed = Self::sign_transaction(transaction_base64, private_key, unit_price, quote_gas_limit, &input.fee)?;
 
         Ok(vec![signed])
     }
@@ -50,50 +51,44 @@ impl ChainSigner for SolanaChainSigner {
 }
 
 impl SolanaChainSigner {
-    fn sign_transaction(tx_base64: &str, private_key: &[u8], unit_price: u64, quote_gas_limit: Option<u32>, fee: &TransactionFee) -> Result<String, SignerError> {
-        let mut tx = decode_transaction(tx_base64).map_err(SignerError::invalid_input)?;
+    fn sign_transaction(transaction_base64: &str, private_key: &[u8], unit_price: u64, quote_gas_limit: Option<u32>, fee: &TransactionFee) -> Result<String, SignerError> {
+        let mut transaction = decode_transaction(transaction_base64).map_err(SignerError::invalid_input)?;
 
         // Skip message modifications if co-signers present — changing the message would invalidate their signatures
-        if tx.signatures().len() <= 1 {
-            let gas_limit = Self::resolve_gas_limit(quote_gas_limit, tx.get_compute_unit_limit(), fee)?;
+        if transaction.signatures().len() <= 1 {
+            let gas_limit = match quote_gas_limit.or(transaction.get_compute_unit_limit()) {
+                Some(gas_limit) => Some(gas_limit),
+                None => {
+                    let gas_limit = fee.gas_limit.to_u32().ok_or_else(|| SignerError::invalid_input("invalid gas limit"))?;
+                    (gas_limit > 0).then_some(gas_limit)
+                }
+            };
             if unit_price > 0 {
-                tx.set_compute_unit_price(unit_price)
+                transaction
+                    .set_compute_unit_price(unit_price)
                     .map_err(|e| SignerError::invalid_input(format!("set compute unit price: {e}")))?;
             }
             if let Some(gas_limit) = gas_limit.filter(|gas_limit| *gas_limit > 0) {
-                tx.set_compute_unit_limit(gas_limit)
+                transaction
+                    .set_compute_unit_limit(gas_limit)
                     .map_err(|e| SignerError::invalid_input(format!("set compute unit limit: {e}")))?;
             }
         }
 
-        let message_bytes = tx.serialize_message().map_err(|e| SignerError::signing_error(format!("serialize message: {e}")))?;
+        let message_bytes = transaction.serialize_message().map_err(|e| SignerError::signing_error(format!("serialize message: {e}")))?;
 
         let sig = sign_message(private_key, &message_bytes).map_err(|e| SignerError::signing_error(format!("sign: {e}")))?;
 
-        let sigs = tx.signatures_mut();
+        let sigs = transaction.signatures_mut();
         if sigs.is_empty() {
             sigs.push(sig);
         } else {
             sigs[0] = sig;
         }
 
-        let bytes = tx.serialize().map_err(|e| SignerError::signing_error(format!("serialize transaction: {e}")))?;
+        let bytes = transaction.serialize().map_err(|e| SignerError::signing_error(format!("serialize transaction: {e}")))?;
 
         Ok(encode_base64(&bytes))
-    }
-
-    fn resolve_gas_limit(quote_gas_limit: Option<u32>, transaction_gas_limit: Option<u32>, fee: &TransactionFee) -> Result<Option<u32>, SignerError> {
-        match quote_gas_limit.or(transaction_gas_limit) {
-            Some(gas_limit) => Ok(Some(gas_limit)),
-            None => {
-                let gas_limit = fee.gas_limit.to_u64().ok_or_else(|| SignerError::invalid_input("invalid gas limit"))?;
-                if gas_limit == 0 {
-                    Ok(None)
-                } else {
-                    gas_limit.try_into().map(Some).map_err(|_| SignerError::invalid_input("invalid gas limit"))
-                }
-            }
-        }
     }
 }
 
@@ -138,9 +133,9 @@ mod tests {
         let result = signer.sign_data(&input, &TEST_PRIVATE_KEY).unwrap();
 
         let signed_bytes = decode_base64(&result).unwrap();
-        let signed_tx = VersionedTransaction::deserialize_with_version(&signed_bytes).unwrap();
-        assert_eq!(signed_tx.signatures().len(), 1);
-        assert_ne!(signed_tx.signatures()[0].as_bytes(), &[0u8; 64]);
+        let signed_transaction = VersionedTransaction::deserialize_with_version(&signed_bytes).unwrap();
+        assert_eq!(signed_transaction.signatures().len(), 1);
+        assert_ne!(signed_transaction.signatures()[0].as_bytes(), &[0u8; 64]);
     }
 
     #[test]
@@ -168,9 +163,9 @@ mod tests {
 
         let result = signer.sign_swap(&input, &TEST_PRIVATE_KEY).unwrap();
 
-        let signed_tx = crate::decode_transaction(&result[0]).unwrap();
-        assert_eq!(signed_tx.get_compute_unit_limit(), original_limit);
-        assert_ne!(signed_tx.signatures()[0].as_bytes(), &[0u8; 64]);
+        let signed_transaction = crate::decode_transaction(&result[0]).unwrap();
+        assert_eq!(signed_transaction.get_compute_unit_limit(), original_limit);
+        assert_ne!(signed_transaction.signatures()[0].as_bytes(), &[0u8; 64]);
     }
 
     #[test]
@@ -185,7 +180,7 @@ mod tests {
 
         let result = signer.sign_swap(&input, &TEST_PRIVATE_KEY).unwrap();
 
-        let signed_tx = crate::decode_transaction(&result[0]).unwrap();
-        assert_eq!(signed_tx.get_compute_unit_limit(), Some(crate::DEFAULT_SWAP_GAS_LIMIT));
+        let signed_transaction = crate::decode_transaction(&result[0]).unwrap();
+        assert_eq!(signed_transaction.get_compute_unit_limit(), Some(crate::DEFAULT_SWAP_GAS_LIMIT));
     }
 }
