@@ -228,7 +228,7 @@ impl PriceAlertClient {
 
             let data = PushNotification {
                 data: serde_json::to_value(&PushNotificationAsset {
-                    asset_id: alert.asset.id.to_string(),
+                    asset_id: alert.asset.id.clone(),
                 })
                 .ok(),
                 notification_type: PushNotificationTypes::PriceAlert,
