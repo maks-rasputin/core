@@ -43,19 +43,12 @@ impl StatusProvider {
             .map_err(|e| TransactionStatusError::NetworkError(e.to_string()))?;
 
         let state = result.status.transaction_state().unwrap_or(TransactionState::InTransit);
-        let changes = result
-            .metadata
-            .map(|m| vec![TransactionChange::Metadata(TransactionMetadata::Swap(m))])
-            .unwrap_or_default();
+        let changes = result.metadata.map(|m| vec![TransactionChange::Metadata(TransactionMetadata::Swap(m))]).unwrap_or_default();
         Ok(TransactionUpdate::new(state, changes))
     }
 }
 
-fn get_transaction_update(
-    chain: Chain,
-    created_at: i64,
-    result: Result<TransactionUpdate, TransactionStatusError>,
-) -> Result<TransactionUpdate, TransactionStatusError> {
+fn get_transaction_update(chain: Chain, created_at: i64, result: Result<TransactionUpdate, TransactionStatusError>) -> Result<TransactionUpdate, TransactionStatusError> {
     let elapsed = Utc::now().timestamp_millis() - created_at;
     let timeout = i64::from(chain_transaction_timeout(chain));
     let expired = elapsed > timeout;
@@ -83,17 +76,8 @@ mod tests {
         let pending = || Ok(TransactionUpdate::new_state(TransactionState::Pending));
         let confirmed = || Ok(TransactionUpdate::new_state(TransactionState::Confirmed));
 
-        assert_eq!(
-            get_transaction_update(chain, now(), pending()).unwrap().state,
-            TransactionState::Pending
-        );
-        assert_eq!(
-            get_transaction_update(chain, 0, pending()).unwrap().state,
-            TransactionState::Failed
-        );
-        assert_eq!(
-            get_transaction_update(chain, 0, confirmed()).unwrap().state,
-            TransactionState::Confirmed
-        );
+        assert_eq!(get_transaction_update(chain, now(), pending()).unwrap().state, TransactionState::Pending);
+        assert_eq!(get_transaction_update(chain, 0, pending()).unwrap().state, TransactionState::Failed);
+        assert_eq!(get_transaction_update(chain, 0, confirmed()).unwrap().state, TransactionState::Confirmed);
     }
 }

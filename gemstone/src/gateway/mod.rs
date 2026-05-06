@@ -15,9 +15,9 @@ use crate::api_client::GemApiClient;
 use crate::models::*;
 use crate::transaction_state::StatusProvider;
 use chain_traits::ChainTraits;
-use swapper::swapper::GemSwapper as Swapper;
 use std::future::Future;
 use std::sync::Arc;
+use swapper::swapper::GemSwapper as Swapper;
 use yielder::Yielder;
 
 use primitives::{AssetId, Chain, ChartPeriod, ScanAddressTarget, ScanTransactionPayload, TransactionPreloadInput};

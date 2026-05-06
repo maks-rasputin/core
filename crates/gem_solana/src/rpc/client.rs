@@ -22,28 +22,19 @@ pub struct SolanaClient<C: Client + Clone> {
     pub chain: Chain,
 }
 
+pub fn confirmed_config(mut extras: serde_json::Value) -> serde_json::Value {
+    if let Some(obj) = extras.as_object_mut() {
+        obj.insert("commitment".to_string(), COMMITMENT_CONFIRMED.into());
+    }
+    extras
+}
+
 pub fn token_accounts_by_owner_params(owner: &str, program_id: &str) -> serde_json::Value {
-    serde_json::json!([
-        owner,
-        {
-            "programId": program_id
-        },
-        {
-            "encoding": "jsonParsed"
-        }
-    ])
+    serde_json::json!([owner, { "programId": program_id }, confirmed_config(serde_json::json!({ "encoding": "jsonParsed" }))])
 }
 
 pub fn token_accounts_by_mint_params(owner: &str, mint: &str) -> serde_json::Value {
-    serde_json::json!([
-        owner,
-        {
-            "mint": mint
-        },
-        {
-            "encoding": "jsonParsed"
-        }
-    ])
+    serde_json::json!([owner, { "mint": mint }, confirmed_config(serde_json::json!({ "encoding": "jsonParsed" }))])
 }
 
 #[cfg(feature = "rpc")]
@@ -68,7 +59,7 @@ impl<C: Client + Clone> SolanaClient<C> {
     }
 
     pub async fn get_balance(&self, address: &str) -> Result<SolanaBalance, JsonRpcError> {
-        self.rpc_call("getBalance", serde_json::json!([address])).await
+        self.rpc_call("getBalance", serde_json::json!([address, confirmed_config(serde_json::json!({}))])).await
     }
 
     pub async fn get_token_accounts_by_owner(&self, owner: &str, program_id: &str) -> Result<ValueResult<Vec<TokenAccountInfo>>, JsonRpcError> {
@@ -77,7 +68,7 @@ impl<C: Client + Clone> SolanaClient<C> {
     }
 
     pub async fn get_epoch_info(&self) -> Result<EpochInfo, JsonRpcError> {
-        self.rpc_call("getEpochInfo", serde_json::json!([])).await
+        self.rpc_call("getEpochInfo", serde_json::json!([confirmed_config(serde_json::json!({}))])).await
     }
 
     pub async fn get_token_accounts_by_mint(&self, owner: &str, mint: &str) -> Result<ValueResult<Vec<TokenAccountInfo>>, JsonRpcError> {
@@ -86,12 +77,7 @@ impl<C: Client + Clone> SolanaClient<C> {
     }
 
     pub async fn get_transaction(&self, signature: &str) -> Result<SolanaTransaction, JsonRpcError> {
-        let params = serde_json::json!([
-            signature,
-            {
-                "maxSupportedTransactionVersion": 0
-            }
-        ]);
+        let params = serde_json::json!([signature, confirmed_config(serde_json::json!({ "maxSupportedTransactionVersion": 0 }))]);
         self.rpc_call("getTransaction", params).await
     }
 
@@ -100,37 +86,25 @@ impl<C: Client + Clone> SolanaClient<C> {
     }
 
     pub async fn get_slot(&self) -> Result<u64, JsonRpcError> {
-        self.rpc_call("getSlot", serde_json::json!([])).await
+        self.rpc_call("getSlot", serde_json::json!([confirmed_config(serde_json::json!({}))])).await
     }
 
     pub async fn get_latest_blockhash(&self) -> Result<SolanaBlockhashResult, JsonRpcError> {
-        self.rpc_call("getLatestBlockhash", serde_json::json!([])).await
+        self.rpc_call("getLatestBlockhash", serde_json::json!([confirmed_config(serde_json::json!({}))])).await
     }
 
     pub async fn get_staking_balance(&self, address: &str) -> Result<Vec<TokenAccountInfo>, JsonRpcError> {
-        let params = serde_json::json!([
-            STAKE_PROGRAM_ID,
-            {
-                "encoding": "jsonParsed",
-                "filters": [
-                    {
-                        "memcmp": {
-                            "offset": 12,
-                            "bytes": address
-                        }
-                    }
-                ]
-            }
-        ]);
-
-        self.rpc_call("getProgramAccounts", params).await
+        let config = confirmed_config(serde_json::json!({
+            "encoding": "jsonParsed",
+            "filters": [
+                { "memcmp": { "offset": 12, "bytes": address } }
+            ]
+        }));
+        self.rpc_call("getProgramAccounts", serde_json::json!([STAKE_PROGRAM_ID, config])).await
     }
 
     pub async fn get_vote_accounts(&self, keep_unstaked_delinquents: bool) -> Result<VoteAccounts, JsonRpcError> {
-        let params = serde_json::json!([{
-            "commitment": COMMITMENT_CONFIRMED,
-            "keepUnstakedDelinquents": keep_unstaked_delinquents
-        }]);
+        let params = serde_json::json!([confirmed_config(serde_json::json!({ "keepUnstakedDelinquents": keep_unstaked_delinquents }))]);
         self.rpc_call("getVoteAccounts", params).await
     }
 
@@ -139,7 +113,7 @@ impl<C: Client + Clone> SolanaClient<C> {
     }
 
     pub async fn get_supply(&self) -> Result<SupplyResult, JsonRpcError> {
-        self.rpc_call("getSupply", serde_json::json!([])).await
+        self.rpc_call("getSupply", serde_json::json!([confirmed_config(serde_json::json!({}))])).await
     }
 
     pub async fn send_transaction(&self, data: String, skip_preflight: Option<bool>) -> Result<String, JsonRpcError> {
@@ -168,16 +142,8 @@ impl<C: Client + Clone> SolanaClient<C> {
     }
 
     pub async fn get_token_mint_info(&self, token_mint: &str) -> Result<ResultTokenInfo, JsonRpcError> {
-        self.rpc_call(
-            "getAccountInfo",
-            serde_json::json!([
-                token_mint,
-                {
-                    "encoding": "jsonParsed"
-                }
-            ]),
-        )
-        .await
+        let params = serde_json::json!([token_mint, confirmed_config(serde_json::json!({ "encoding": "jsonParsed" }))]);
+        self.rpc_call("getAccountInfo", params).await
     }
 
     pub async fn get_metaplex_metadata(&self, token_mint: &str) -> Result<crate::metaplex::metadata::Metadata, Box<dyn Error + Send + Sync>> {
@@ -198,12 +164,7 @@ impl<C: Client + Clone> SolanaClient<C> {
         let result: ValueResult<Option<ValueData<Vec<String>>>> = self
             .rpc_call(
                 "getAccountInfo",
-                serde_json::json!([
-                    metadata_key,
-                    {
-                        "encoding": "base64"
-                    }
-                ]),
+                serde_json::json!([metadata_key, confirmed_config(serde_json::json!({ "encoding": "base64" }))]),
             )
             .await?;
 
@@ -213,26 +174,17 @@ impl<C: Client + Clone> SolanaClient<C> {
     }
 
     pub async fn get_block_transactions(&self, slot: u64) -> Result<BlockTransactions, JsonRpcError> {
-        let params = serde_json::json!([
-            slot,
-            {
-                "encoding": "json",
-                "transactionDetails": "full",
-                "rewards": false,
-                "maxSupportedTransactionVersion": 0
-            }
-        ]);
-        self.rpc_call("getBlock", params).await
+        let config = confirmed_config(serde_json::json!({
+            "encoding": "json",
+            "transactionDetails": "full",
+            "rewards": false,
+            "maxSupportedTransactionVersion": 0,
+        }));
+        self.rpc_call("getBlock", serde_json::json!([slot, config])).await
     }
 
     pub async fn get_signatures_for_address(&self, address: &str, limit: usize) -> Result<Vec<Signature>, JsonRpcError> {
-        let params = serde_json::json!([
-            address,
-            {
-                "limit": limit,
-                "commitment": COMMITMENT_CONFIRMED
-            }
-        ]);
+        let params = serde_json::json!([address, confirmed_config(serde_json::json!({ "limit": limit }))]);
         self.rpc_call("getSignaturesForAddress", params).await
     }
 
@@ -240,13 +192,11 @@ impl<C: Client + Clone> SolanaClient<C> {
         let mut transactions = Vec::new();
 
         for signature in signatures {
-            let params = serde_json::json!([
-                signature,
-                {
-                    "encoding": "json",
-                    "maxSupportedTransactionVersion": 0
-                }
-            ]);
+            let config = confirmed_config(serde_json::json!({
+                "encoding": "json",
+                "maxSupportedTransactionVersion": 0,
+            }));
+            let params = serde_json::json!([signature, config]);
 
             if let Ok(tx) = self.rpc_call::<crate::models::BlockTransaction>("getTransaction", params).await {
                 transactions.push(tx);

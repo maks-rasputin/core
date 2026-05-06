@@ -64,7 +64,8 @@ async fn run_store_transactions(
         config,
         vault_client: SwapVaultAddressClient::new(cacher),
     };
-    run_consumer::<TransactionsPayload, StoreTransactionsConsumer, usize>(&name, stream_reader, queue, None, consumer, consumer_config(&settings.consumer), shutdown_rx, reporter).await
+    run_consumer::<TransactionsPayload, StoreTransactionsConsumer, usize>(&name, stream_reader, queue, None, consumer, consumer_config(&settings.consumer), shutdown_rx, reporter)
+        .await
 }
 
 async fn run_store_prices(
