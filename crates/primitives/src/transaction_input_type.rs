@@ -173,6 +173,10 @@ impl TransactionLoadInput {
         self.input_type.get_generic_data()
     }
 
+    pub fn get_memo(&self) -> Option<&str> {
+        self.memo.as_deref().filter(|m| !m.is_empty())
+    }
+
     pub fn to_preload_input(&self) -> TransactionPreloadInput {
         TransactionPreloadInput {
             input_type: self.input_type.clone(),

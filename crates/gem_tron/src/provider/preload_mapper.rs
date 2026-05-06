@@ -6,30 +6,34 @@ use num_bigint::BigInt;
 use crate::models::ChainParameter;
 use crate::models::TronAccountUsage;
 use crate::models::account::{TronAccount, TronFrozen};
-use crate::rpc::constants::{DEFAULT_BANDWIDTH_BYTES, GET_CREATE_ACCOUNT_FEE, GET_CREATE_NEW_ACCOUNT_FEE_IN_SYSTEM_CONTRACT, GET_ENERGY_FEE, GET_TRANSACTION_FEE};
+use crate::rpc::constants::{DEFAULT_BANDWIDTH_BYTES, GET_CREATE_ACCOUNT_FEE, GET_CREATE_NEW_ACCOUNT_FEE_IN_SYSTEM_CONTRACT, GET_ENERGY_FEE, GET_MEMO_FEE, GET_TRANSACTION_FEE};
 use primitives::{Resource, StakeType, TronStakeData, TronUnfreeze, TronVote};
 
 const FEE_LIMIT_BUFFER_PERCENT: u64 = 20;
 
-pub fn calculate_transfer_fee_rate(chain_parameters: &[ChainParameter], account_usage: &TronAccountUsage, is_new_account: bool) -> Result<BigInt, Box<dyn Error + Send + Sync>> {
+pub fn calculate_transfer_fee_rate(
+    chain_parameters: &[ChainParameter],
+    account_usage: &TronAccountUsage,
+    is_new_account: bool,
+    has_memo: bool,
+) -> Result<BigInt, Box<dyn Error + Send + Sync>> {
     let bandwidth_price = get_chain_parameter_value(chain_parameters, GET_TRANSACTION_FEE)?;
+    let memo_fee = if has_memo { get_chain_parameter_value(chain_parameters, GET_MEMO_FEE)? } else { 0 };
 
-    if is_new_account {
+    let base_fee: i64 = if is_new_account {
         let activation_fee = get_chain_parameter_value(chain_parameters, GET_CREATE_NEW_ACCOUNT_FEE_IN_SYSTEM_CONTRACT)?;
-        let bandwidth_fee = get_chain_parameter_value(chain_parameters, GET_CREATE_ACCOUNT_FEE)?;
+        let new_account_bandwidth_fee = get_chain_parameter_value(chain_parameters, GET_CREATE_ACCOUNT_FEE)?;
 
-        let available_bandwidth = account_usage.available_bandwidth();
-        let total_fee = if available_bandwidth >= DEFAULT_BANDWIDTH_BYTES {
-            BigInt::from(activation_fee)
+        if account_usage.available_bandwidth() >= DEFAULT_BANDWIDTH_BYTES {
+            activation_fee
         } else {
-            BigInt::from(activation_fee) + BigInt::from(bandwidth_fee)
-        };
-
-        Ok(total_fee)
+            activation_fee + new_account_bandwidth_fee
+        }
     } else {
-        let fee = bandwidth_fee(account_usage, DEFAULT_BANDWIDTH_BYTES, bandwidth_price as u64);
-        Ok(BigInt::from(fee))
-    }
+        bandwidth_fee(account_usage, DEFAULT_BANDWIDTH_BYTES, bandwidth_price as u64) as i64
+    };
+
+    Ok(BigInt::from(base_fee + memo_fee))
 }
 
 pub fn calculate_transfer_token_fee_rate(
@@ -278,14 +282,25 @@ mod tests {
 
     #[test]
     fn test_calculate_transfer_fee_rate_existing_account() {
-        let params = vec![chain_parameter(GET_TRANSACTION_FEE, 1000)];
+        let params = vec![chain_parameter(GET_TRANSACTION_FEE, 1000), chain_parameter(GET_MEMO_FEE, 1_000_000)];
 
         let with_bandwidth = account_usage(DEFAULT_BANDWIDTH_BYTES, 0, 0);
-        assert_eq!(calculate_transfer_fee_rate(&params, &with_bandwidth, false).unwrap(), BigInt::from(0));
+        assert_eq!(calculate_transfer_fee_rate(&params, &with_bandwidth, false, false).unwrap(), BigInt::from(0));
+        assert_eq!(
+            calculate_transfer_fee_rate(&params, &with_bandwidth, false, true).unwrap(),
+            BigInt::from(1_000_000), // memo fee only
+        );
 
         let without_bandwidth = account_usage(100, 0, 0);
-        let expected = BigInt::from(DEFAULT_BANDWIDTH_BYTES * 1000);
-        assert_eq!(calculate_transfer_fee_rate(&params, &without_bandwidth, false).unwrap(), expected);
+        let burn_bandwidth = DEFAULT_BANDWIDTH_BYTES * 1000;
+        assert_eq!(
+            calculate_transfer_fee_rate(&params, &without_bandwidth, false, false).unwrap(),
+            BigInt::from(burn_bandwidth),
+        );
+        assert_eq!(
+            calculate_transfer_fee_rate(&params, &without_bandwidth, false, true).unwrap(),
+            BigInt::from(burn_bandwidth + 1_000_000),
+        );
     }
 
     #[test]
@@ -294,18 +309,23 @@ mod tests {
             chain_parameter(GET_TRANSACTION_FEE, 1000),
             chain_parameter(GET_CREATE_ACCOUNT_FEE, 100_000),
             chain_parameter(GET_CREATE_NEW_ACCOUNT_FEE_IN_SYSTEM_CONTRACT, 1_000_000),
+            chain_parameter(GET_MEMO_FEE, 1_000_000),
         ];
 
         let without_bandwidth = account_usage(0, 0, 0);
         assert_eq!(
-            calculate_transfer_fee_rate(&params, &without_bandwidth, true).unwrap(),
-            BigInt::from(1_100_000) // activation + bandwidth
+            calculate_transfer_fee_rate(&params, &without_bandwidth, true, false).unwrap(),
+            BigInt::from(1_100_000), // activation + bandwidth
+        );
+        assert_eq!(
+            calculate_transfer_fee_rate(&params, &without_bandwidth, true, true).unwrap(),
+            BigInt::from(2_100_000), // activation + bandwidth + memo
         );
 
         let with_bandwidth = account_usage(DEFAULT_BANDWIDTH_BYTES, 0, 0);
         assert_eq!(
-            calculate_transfer_fee_rate(&params, &with_bandwidth, true).unwrap(),
-            BigInt::from(1_000_000) // only activation
+            calculate_transfer_fee_rate(&params, &with_bandwidth, true, false).unwrap(),
+            BigInt::from(1_000_000), // only activation
         );
     }
 

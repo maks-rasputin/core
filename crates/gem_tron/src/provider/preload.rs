@@ -47,9 +47,10 @@ impl<C: Client> ChainTransactionLoad for TronClient<C> {
             stake_data,
         };
 
+        let has_memo = input.get_memo().is_some();
         let fee = match &input.input_type {
             TransactionInputType::Transfer(asset) | TransactionInputType::TransferNft(asset, _) | TransactionInputType::Account(asset, _) => match &asset.id.token_id {
-                None => TransactionFee::new_from_fee(calculate_transfer_fee_rate(&chain_parameters, &account_usage, is_new_account)?),
+                None => TransactionFee::new_from_fee(calculate_transfer_fee_rate(&chain_parameters, &account_usage, is_new_account, has_memo)?),
                 Some(token_id) => {
                     self.estimate_token_transfer_fee(
                         input.sender_address.clone(),
@@ -68,13 +69,13 @@ impl<C: Client> ChainTransactionLoad for TronClient<C> {
                     .await?
                 {
                     Some(fee) => fee,
-                    None => TransactionFee::new_from_fee(calculate_transfer_fee_rate(&chain_parameters, &account_usage, is_new_account)?),
+                    None => TransactionFee::new_from_fee(calculate_transfer_fee_rate(&chain_parameters, &account_usage, is_new_account, has_memo)?),
                 },
-                TransferDataOutputAction::Sign => TransactionFee::new_from_fee(calculate_transfer_fee_rate(&chain_parameters, &account_usage, is_new_account)?),
+                TransferDataOutputAction::Sign => TransactionFee::new_from_fee(calculate_transfer_fee_rate(&chain_parameters, &account_usage, is_new_account, false)?),
             },
             TransactionInputType::Stake(_asset, stake_type) => TransactionFee::new_from_fee(calculate_stake_fee_rate(&chain_parameters, &account_usage, stake_type)?),
             TransactionInputType::Swap(from_asset, _, swap_data) => match &from_asset.id.token_id {
-                None => TransactionFee::new_from_fee(calculate_transfer_fee_rate(&chain_parameters, &account_usage, is_new_account)?),
+                None => TransactionFee::new_from_fee(calculate_transfer_fee_rate(&chain_parameters, &account_usage, is_new_account, has_memo)?),
                 Some(token_id) => {
                     self.estimate_token_transfer_fee(
                         input.sender_address.clone(),
@@ -87,7 +88,7 @@ impl<C: Client> ChainTransactionLoad for TronClient<C> {
                     .await?
                 }
             },
-            _ => TransactionFee::new_from_fee(calculate_transfer_fee_rate(&chain_parameters, &account_usage, is_new_account)?),
+            _ => TransactionFee::new_from_fee(calculate_transfer_fee_rate(&chain_parameters, &account_usage, is_new_account, has_memo)?),
         };
 
         Ok(TransactionLoadData { fee, metadata })

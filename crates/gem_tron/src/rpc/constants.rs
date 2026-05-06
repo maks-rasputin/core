@@ -11,6 +11,7 @@ pub const GET_ENERGY_FEE: &str = "getEnergyFee";
 pub const GET_CREATE_NEW_ACCOUNT_FEE_IN_SYSTEM_CONTRACT: &str = "getCreateNewAccountFeeInSystemContract";
 pub const GET_CREATE_ACCOUNT_FEE: &str = "getCreateAccountFee";
 pub const GET_TRANSACTION_FEE: &str = "getTransactionFee";
+pub const GET_MEMO_FEE: &str = "getMemoFee";
 pub const GET_WITNESS_PAY_PER_BLOCK: &str = "getWitnessPayPerBlock";
 pub const GET_WITNESS_127_PAY_PER_BLOCK: &str = "getWitness127PayPerBlock";
 
