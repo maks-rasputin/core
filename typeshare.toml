@@ -20,7 +20,7 @@ prefix = ''
 "Int64" = "Long"
 "DateTime" = "SerializedDate"
 "Data" = "ByteArray"
-"Value" = "String?"
+"Value" = "JsonValue"
 "BigInt" = "String"
 "BigUint" = "String"
 
