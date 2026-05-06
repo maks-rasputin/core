@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::models::UInt64;
+use crate::models::{UInt64, transaction_id::HyperCoreTransactionId};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -96,10 +96,10 @@ impl TransactionBroadcastResponse {
                             return BroadcastResult::Error(error);
                         }
                         if let Some(filled) = status.filled {
-                            return BroadcastResult::Success(filled.oid.to_string());
+                            return BroadcastResult::Success(HyperCoreTransactionId::Order(filled.oid).to_string());
                         }
                         if let Some(resting) = status.resting {
-                            return BroadcastResult::Success(resting.oid.to_string());
+                            return BroadcastResult::Success(HyperCoreTransactionId::Order(resting.oid).to_string());
                         }
                     }
                     match action_id {
@@ -145,7 +145,7 @@ mod tests {
             .unwrap()
             .into_result(None);
         let BroadcastResult::Success(oid) = result else { panic!("Expected success") };
-        assert_eq!(oid, "134896397196");
+        assert_eq!(oid, "order:134896397196");
     }
 
     #[test]
@@ -154,7 +154,7 @@ mod tests {
             .unwrap()
             .into_result(None);
         let BroadcastResult::Success(oid) = result else { panic!("Expected success") };
-        assert_eq!(oid, "789012");
+        assert_eq!(oid, "order:789012");
     }
 
     #[test]

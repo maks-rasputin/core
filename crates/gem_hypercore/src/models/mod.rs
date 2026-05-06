@@ -11,6 +11,7 @@ pub mod response;
 pub mod spot;
 pub mod timestamp;
 pub mod token;
+pub mod transaction_id;
 pub mod user;
 pub mod websocket;
 

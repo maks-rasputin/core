@@ -21,7 +21,7 @@ use crate::{
             update_leverage_typed_data, withdrawal_request_typed_data,
         },
     },
-    models::action::{ACTION_ID_PREFIX, ExchangeRequest},
+    models::{action::ExchangeRequest, transaction_id::HyperCoreTransactionId},
     provider::{
         BroadcastProvider,
         transactions_mapper::{map_transaction_broadcast, map_transaction_broadcast_from_str},
@@ -66,7 +66,7 @@ fn cache_transaction_sender<C: Client>(client: &HyperCoreClient<C>, data: &str, 
     client.cache_transaction_sender(transaction_id, &sender)?;
 
     if let Some(nonce) = ExchangeRequest::get_nonce(data) {
-        client.cache_transaction_sender(&format!("{ACTION_ID_PREFIX}{nonce}"), &sender)?;
+        client.cache_transaction_sender(&HyperCoreTransactionId::Action(nonce).to_string(), &sender)?;
     }
 
     Ok(())
@@ -139,10 +139,10 @@ mod tests {
             .cache_agent_owner("0xbbb0187503c3b5f08b03d674b9ac86ec30d790d2", "0xba4d1d35bce0e8f28e5a3403e7a0b996c5d50ac4")
             .unwrap();
 
-        cache_transaction_sender(&client, include_str!("../../testdata/hl_action_open_long_order.json").trim(), "187530505765").unwrap();
+        cache_transaction_sender(&client, include_str!("../../testdata/hl_action_open_long_order.json").trim(), "order:187530505765").unwrap();
 
         assert_eq!(
-            client.get_cached_transaction_sender("187530505765").unwrap().as_deref(),
+            client.get_cached_transaction_sender("order:187530505765").unwrap().as_deref(),
             Some("0xba4d1d35bce0e8f28e5a3403e7a0b996c5d50ac4")
         );
     }

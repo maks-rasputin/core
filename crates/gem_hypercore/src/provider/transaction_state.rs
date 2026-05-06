@@ -5,7 +5,7 @@ use std::error::Error;
 
 use gem_client::Client;
 
-use crate::{models::action::ExchangeRequest, provider::transaction_state_mapper, rpc::client::HyperCoreClient};
+use crate::{models::transaction_id::HyperCoreTransactionId, provider::transaction_state_mapper, rpc::client::HyperCoreClient};
 
 #[async_trait]
 impl<C: Client> ChainTransactionState for HyperCoreClient<C> {
@@ -16,18 +16,19 @@ impl<C: Client> ChainTransactionState for HyperCoreClient<C> {
 
 impl<C: Client> HyperCoreClient<C> {
     pub async fn transaction_state(&self, request: TransactionStateRequest) -> Result<TransactionUpdate, Box<dyn Error + Sync + Send>> {
-        match request.id.parse::<u64>() {
-            Ok(oid) => {
+        let id = HyperCoreTransactionId::parse(&request.id).ok_or("Invalid Hypercore transaction id")?;
+
+        match id {
+            HyperCoreTransactionId::Order(oid) => {
                 let start_time = request.created_at - 5_000;
                 let fills = self.get_user_fills_by_time(&request.sender_address, start_time).await?;
                 Ok(transaction_state_mapper::map_transaction_state_order(fills, oid, request.id))
             }
-            Err(_) => self.action_state(&request).await,
+            HyperCoreTransactionId::Action(nonce) => self.action_state(&request, nonce).await,
         }
     }
 
-    async fn action_state(&self, request: &TransactionStateRequest) -> Result<TransactionUpdate, Box<dyn Error + Sync + Send>> {
-        let nonce = ExchangeRequest::get_nonce(&request.id).ok_or("Invalid action request id")?;
+    async fn action_state(&self, request: &TransactionStateRequest, nonce: u64) -> Result<TransactionUpdate, Box<dyn Error + Sync + Send>> {
         let updates = self.get_ledger_updates(&request.sender_address).await?;
         Ok(transaction_state_mapper::map_transaction_state_action(updates, nonce, request.id.clone()))
     }

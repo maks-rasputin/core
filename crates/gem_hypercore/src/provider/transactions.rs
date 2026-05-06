@@ -6,8 +6,7 @@ use gem_client::Client;
 use primitives::Transaction;
 
 use crate::{
-    models::action::ExchangeRequest,
-    models::{order::UserFill, spot::SpotMeta},
+    models::{order::UserFill, spot::SpotMeta, transaction_id::HyperCoreTransactionId},
     provider::transactions_mapper::{map_user_fill_by_hash, map_user_fill_by_oid, map_user_fills},
     rpc::client::HyperCoreClient,
 };
@@ -35,15 +34,11 @@ impl<C: Client> ChainTransactions for HyperCoreClient<C> {
             return self.get_transaction_by_tx_hash(hash).await;
         }
 
-        if let Ok(oid) = hash.parse::<u64>() {
-            return self.get_transaction_by_order_id(oid, hash).await;
+        match HyperCoreTransactionId::parse(hash) {
+            Some(HyperCoreTransactionId::Order(oid)) => self.get_transaction_by_order_id(oid, hash).await,
+            Some(HyperCoreTransactionId::Action(nonce)) => self.get_transaction_by_action_id(hash, nonce).await,
+            None => Ok(None),
         }
-
-        if let Some(nonce) = ExchangeRequest::get_nonce(hash) {
-            return self.get_transaction_by_action_id(hash, nonce).await;
-        }
-
-        Ok(None)
     }
 }
 
@@ -97,9 +92,10 @@ mod integration_tests {
         assert_eq!(transaction.hash, TEST_TRANSACTION_ID);
 
         let sender = client.get_cached_transaction_sender(TEST_TRANSACTION_ID)?.unwrap();
-        client.cache_transaction_sender(TEST_TRANSACTION_ORDER_ID, &sender)?;
+        let order_id = HyperCoreTransactionId::Order(TEST_TRANSACTION_ORDER_ID.parse()?).to_string();
+        client.cache_transaction_sender(&order_id, &sender)?;
 
-        let transaction = client.get_transaction_by_hash(format!("hypercore_{TEST_TRANSACTION_ORDER_ID}")).await?.unwrap();
+        let transaction = client.get_transaction_by_hash(format!("hypercore_{order_id}")).await?.unwrap();
         assert_eq!(transaction.hash, TEST_TRANSACTION_ID);
 
         Ok(())
