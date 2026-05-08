@@ -564,9 +564,7 @@ mod tests {
 mod swap_integration_tests {
     use super::*;
     use crate::near_intents::assets::NEAR_INTENTS_BTC_NATIVE;
-    use crate::{
-        FetchQuoteData, SwapperMode, SwapperQuoteAsset, alien::reqwest_provider::NativeProvider, config::get_swap_config, models::Options,
-    };
+    use crate::{FetchQuoteData, SwapperMode, SwapperQuoteAsset, alien::reqwest_provider::NativeProvider, config::get_swap_config, models::Options};
     use primitives::{
         AssetId, Chain,
         asset_constants::{ARBITRUM_USDC_ASSET_ID, BASE_USDC_ASSET_ID},
