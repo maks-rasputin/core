@@ -7,7 +7,6 @@ use crate::{ChainAddress, WalletId};
 #[typeshare(swift = "Equatable, Sendable")]
 #[serde(rename_all = "camelCase")]
 pub struct WalletConfiguration {
-    #[serde(default)]
     pub multi_signature_accounts: Vec<ChainAddress>,
 }
 
