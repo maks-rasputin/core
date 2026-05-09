@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::error::Error;
 
 use cacher::{CacheKey, CacherClient};
+use futures::future::join_all;
 use primitives::{AddressStatus, Chain, ChainAddress, WalletConfiguration, WalletConfigurationResult, WalletId};
 use settings_chain::ChainProviders;
 use storage::{Database, WalletsRepository};
@@ -23,19 +24,25 @@ impl WalletConfigurationClient {
         Ok(WalletConfigurationResult {
             wallet_id: wallet_identifier,
             configuration: WalletConfiguration {
-                has_multi_signature_accounts: self.has_multi_signature_accounts(device_id, wallet_id).await?.then_some(true),
+                multi_signature_accounts: self.multi_signature_accounts(device_id, wallet_id).await?,
             },
         })
     }
 
-    async fn has_multi_signature_accounts(&self, device_id: i32, wallet_id: i32) -> Result<bool, Box<dyn Error + Send + Sync>> {
-        for address in self.subscribed_addresses(device_id, wallet_id)? {
-            if self.get_statuses(address).await.is_some_and(|statuses| statuses.contains(&AddressStatus::MultiSignature)) {
-                return Ok(true);
-            }
-        }
+    async fn multi_signature_accounts(&self, device_id: i32, wallet_id: i32) -> Result<Vec<ChainAddress>, Box<dyn Error + Send + Sync>> {
+        Ok(join_all(
+            self.subscribed_addresses(device_id, wallet_id)?
+                .into_iter()
+                .map(|address| async move { self.has_multi_signature_status(&address).await.then_some(address) }),
+        )
+        .await
+        .into_iter()
+        .flatten()
+        .collect())
+    }
 
-        Ok(false)
+    async fn has_multi_signature_status(&self, address: &ChainAddress) -> bool {
+        self.get_statuses(address).await.is_some_and(|statuses| statuses.contains(&AddressStatus::MultiSignature))
     }
 
     fn subscribed_addresses(&self, device_id: i32, wallet_id: i32) -> Result<HashSet<ChainAddress>, Box<dyn Error + Send + Sync>> {
@@ -52,10 +59,10 @@ impl WalletConfigurationClient {
             .collect())
     }
 
-    async fn get_statuses(&self, address: ChainAddress) -> Option<Vec<AddressStatus>> {
+    async fn get_statuses(&self, address: &ChainAddress) -> Option<Vec<AddressStatus>> {
         if let Some(statuses) = self
             .cacher
-            .get_cached_optional::<Vec<AddressStatus>>(cache_key(&address))
+            .get_cached_optional::<Vec<AddressStatus>>(cache_key(address))
             .await
             .ok()
             .flatten()
@@ -69,7 +76,7 @@ impl WalletConfigurationClient {
             return None;
         }
 
-        let _ = self.cacher.set_cached(cache_key(&address), &statuses).await;
+        let _ = self.cacher.set_cached(cache_key(address), &statuses).await;
 
         Some(statuses)
     }

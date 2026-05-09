@@ -609,6 +609,7 @@ dependencies = [
  "chrono",
  "config",
  "fiat",
+ "futures",
  "gem_auth",
  "gem_client",
  "gem_hash",
