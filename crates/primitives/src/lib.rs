@@ -138,6 +138,8 @@ pub mod verification_status;
 pub use self::verification_status::VerificationStatus;
 pub mod address_status;
 pub use self::address_status::AddressStatus;
+pub mod wallet_configuration;
+pub use self::wallet_configuration::{WalletConfiguration, WalletConfigurationResult};
 pub mod utxo;
 pub use self::utxo::UTXO;
 pub mod push_notification;
