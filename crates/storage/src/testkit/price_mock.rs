@@ -16,6 +16,7 @@ impl PriceRow {
             all_time_low: 0.0,
             all_time_low_date: None,
             market_cap_rank: None,
+            total_volume: None,
             last_updated_at: Utc::now().naive_utc(),
         }
     }

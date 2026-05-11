@@ -91,6 +91,7 @@ impl AssetPriceFull {
             all_time_low: market.all_time_low.unwrap_or_default(),
             all_time_low_date: market.all_time_low_date,
             market_cap_rank: market.market_cap_rank,
+            total_volume: market.total_volume,
             last_updated_at: self.price.updated_at,
         }
     }

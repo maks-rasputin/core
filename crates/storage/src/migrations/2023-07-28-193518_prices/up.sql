@@ -22,6 +22,7 @@ CREATE TABLE prices (
     all_time_low_date  timestamp,
     all_time_high      float NOT NULL DEFAULT 0,
     all_time_low       float NOT NULL DEFAULT 0,
+    total_volume       float,
     UNIQUE (provider, provider_price_id)
 );
 

@@ -63,6 +63,7 @@ impl PricesStore for DatabaseClient {
                 price.eq(excluded(price)),
                 price_change_percentage_24h.eq(excluded(price_change_percentage_24h)),
                 market_cap_rank.eq(excluded(market_cap_rank)),
+                total_volume.eq(excluded(total_volume)),
                 last_updated_at.eq(excluded(last_updated_at)),
             ))
             .execute(&mut self.connection)

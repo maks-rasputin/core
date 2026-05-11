@@ -25,6 +25,7 @@ pub struct PriceRow {
     pub all_time_low: f64,
     pub all_time_low_date: Option<NaiveDateTime>,
     pub market_cap_rank: Option<i32>,
+    pub total_volume: Option<f64>,
     pub last_updated_at: NaiveDateTime,
 }
 
@@ -41,6 +42,7 @@ pub struct NewPriceRow {
     pub all_time_high_date: Option<NaiveDateTime>,
     pub all_time_low: f64,
     pub all_time_low_date: Option<NaiveDateTime>,
+    pub total_volume: Option<f64>,
 }
 
 #[derive(Default, AsChangeset)]
@@ -98,6 +100,7 @@ impl NewPriceRow {
             all_time_high_date: market.and_then(|m| m.all_time_high_date).map(|d| d.naive_utc()),
             all_time_low: market.and_then(|m| m.all_time_low).unwrap_or(0.0),
             all_time_low_date: market.and_then(|m| m.all_time_low_date).map(|d| d.naive_utc()),
+            total_volume: market.and_then(|m| m.total_volume),
         }
     }
 }
@@ -148,7 +151,7 @@ impl Hash for PriceRow {
 
 impl PriceRow {
     pub fn with_price(provider: PriceProvider, provider_price_id: String, price: f64) -> Self {
-        Self::new(provider, provider_price_id, price, 0.0, 0.0, None, 0.0, None, None, chrono::Utc::now().naive_utc())
+        Self::new(provider, provider_price_id, price, 0.0, 0.0, None, 0.0, None, None, None, chrono::Utc::now().naive_utc())
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -162,6 +165,7 @@ impl PriceRow {
         all_time_low: f64,
         all_time_low_date: Option<NaiveDateTime>,
         market_cap_rank: Option<i32>,
+        total_volume: Option<f64>,
         last_updated_at: NaiveDateTime,
     ) -> Self {
         let id = PriceId::id_for(provider, &provider_price_id);
@@ -177,6 +181,7 @@ impl PriceRow {
             all_time_low,
             all_time_low_date,
             market_cap_rank,
+            total_volume,
         }
     }
 
@@ -262,7 +267,7 @@ impl PriceRow {
             market_cap,
             market_cap_fdv,
             market_cap_rank: self.market_cap_rank,
-            total_volume: None,
+            total_volume: self.total_volume,
             circulating_supply: asset.circulating_supply,
             total_supply: asset.total_supply,
             max_supply: asset.max_supply,
@@ -305,6 +310,7 @@ impl PriceRow {
             all_time_low: self.all_time_low,
             all_time_low_date: self.all_time_low_date.map(|d| d.and_utc()),
             market_cap_rank: self.market_cap_rank,
+            total_volume: self.total_volume,
             last_updated_at: self.last_updated_at.and_utc(),
         }
     }
@@ -321,6 +327,7 @@ impl PriceRow {
             all_time_low: data.all_time_low,
             all_time_low_date: data.all_time_low_date.map(|d| d.naive_utc()),
             market_cap_rank: data.market_cap_rank,
+            total_volume: data.total_volume,
             last_updated_at: data.last_updated_at.naive_utc(),
         }
     }
@@ -336,7 +343,19 @@ mod tests {
     }
 
     fn row(price: f64, ath: f64, ath_d: Option<NaiveDateTime>, atl: f64, atl_d: Option<NaiveDateTime>) -> PriceRow {
-        PriceRow::new(PriceProvider::Pyth, "x".into(), price, 0.0, ath, ath_d, atl, atl_d, None, ts(1000))
+        PriceRow::new(PriceProvider::Pyth, "x".into(), price, 0.0, ath, ath_d, atl, atl_d, None, None, ts(1000))
+    }
+
+    #[test]
+    fn test_total_volume_market_roundtrip() {
+        let mut price = row(50.0, 100.0, Some(ts(100)), 10.0, Some(ts(200)));
+        price.total_volume = Some(123.0);
+
+        let price_data = price.as_price_data();
+        let price_row = PriceRow::from_price_data(price_data);
+
+        assert_eq!(price_row.total_volume, Some(123.0));
+        assert_eq!(price_row.as_market_primitive(&AssetRow::mock()).total_volume, Some(123.0));
     }
 
     #[test]
