@@ -24,6 +24,7 @@ use nft::NFTClient;
 use primitives::DeviceToken;
 use primitives::device::Device;
 use primitives::name::NameRecord;
+use primitives::nft::NFTAssetData;
 use primitives::rewards::{RedemptionRequest, RedemptionResult, RewardRedemptionOption};
 use primitives::{
     AddressName, AssetId, AuthNonce, ChainAddress, FiatAssets, FiatQuote, FiatQuoteRequest, FiatQuoteType, FiatQuoteUrl, FiatQuotes, InAppNotification, NFTData, PortfolioAssets,
@@ -100,6 +101,11 @@ pub async fn get_device_address_names_v2(
 #[get("/devices/nft_assets")]
 pub async fn get_device_nft_assets_v2(device: AuthenticatedDeviceWallet, client: &State<NFTClient>) -> Result<ApiResponse<Vec<NFTData>>, ApiError> {
     Ok(client.get_nft_assets_by_wallet_id(device.device_row.id, device.wallet_id).await?.into())
+}
+
+#[get("/devices/nft_assets/<asset_id>")]
+pub async fn get_device_nft_asset_v2(_device: AuthenticatedDevice, asset_id: NftAssetIdParam, client: &State<NFTClient>) -> Result<ApiResponse<NFTAssetData>, ApiError> {
+    Ok(client.get_nft_asset_data(asset_id.0)?.into())
 }
 
 #[post("/devices/nft_assets/<asset_id>/refresh")]

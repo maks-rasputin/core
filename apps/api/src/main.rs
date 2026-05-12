@@ -120,6 +120,7 @@ fn mount_routes(rocket: Rocket<Build>, admin_enabled: bool) -> Rocket<Build> {
                 devices::get_device_transactions_v2,
                 devices::get_device_address_names_v2,
                 devices::get_device_nft_assets_v2,
+                devices::get_device_nft_asset_v2,
                 devices::refresh_device_nft_asset_v2,
                 devices::get_device_rewards_v2,
                 devices::get_device_rewards_events_v2,

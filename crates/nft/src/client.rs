@@ -1,11 +1,12 @@
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 
+use primitives::nft::NFTAssetData;
 use primitives::{AssetId, Chain, ImageFormatter, NFTAsset, NFTAssetId, NFTCollection, NFTCollectionId, NFTData};
 use storage::database::devices::DevicesStore;
 use storage::database::nft::{NftAssetFilter, NftCollectionFilter};
 use storage::models::{NewNftAssetRow, NewNftCollectionRow, NftCollectionRow, NftLinkRow};
-use storage::{Database, NftRepository, WalletsRepository};
+use storage::{Database, DatabaseError, NftRepository, WalletsRepository};
 
 use crate::NFTProviderConfig;
 use crate::provider_client::NFTProviderClient;
@@ -69,6 +70,13 @@ impl NFTClient {
         }
 
         self.preload(asset_ids.into_iter().collect()).await
+    }
+
+    pub fn get_nft_asset_data(&self, asset_id: NFTAssetId) -> Result<NFTAssetData, Box<dyn Error + Send + Sync>> {
+        let asset = self.with_urls_asset(self.load_nft_asset(&asset_id.to_string())?);
+        let collection = self.with_urls_collection(self.load_nft_collection(&asset.collection_id)?);
+
+        Ok(NFTAssetData { collection, asset })
     }
 
     async fn get_provider_asset_ids(&self, chain: Chain, address: &str) -> Result<HashSet<NFTAssetId>, Box<dyn Error + Send + Sync>> {
@@ -245,7 +253,10 @@ impl NFTClient {
     }
 
     pub fn load_nft_asset(&self, asset_id: &str) -> Result<NFTAsset, Box<dyn Error + Send + Sync>> {
-        self.load_nft_assets(vec![asset_id.to_string()])?.into_iter().next().ok_or_else(|| "asset not found".into())
+        self.load_nft_assets(vec![asset_id.to_string()])?
+            .into_iter()
+            .next()
+            .ok_or_else(|| DatabaseError::not_found("NftAsset", asset_id).into())
     }
 
     pub fn load_nft_collection(&self, collection_id: &str) -> Result<NFTCollection, Box<dyn Error + Send + Sync>> {
