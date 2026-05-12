@@ -369,7 +369,7 @@ mod swap_integration_tests {
     use super::*;
     use crate::{
         alien::reqwest_provider::NativeProvider,
-        {SwapperMode, SwapperQuoteAsset, models::Options},
+        {SwapperQuoteAsset, models::Options},
     };
     use primitives::{AssetId, asset_constants::SUI_USDC_TOKEN_ID, swap::SwapStatus};
 
@@ -386,7 +386,6 @@ mod swap_integration_tests {
             wallet_address: "0x514BCb1F9AAbb904e6106Bd1052B66d2706dBbb7".to_string(),
             destination_address: "7g2rVN8fAAQdPh1mkajpvELqYa3gWvFXJsBLnKfEQfqy".to_string(),
             value: "50000000000000000".to_string(),
-            mode: SwapperMode::ExactIn,
             options,
         };
 
@@ -420,7 +419,6 @@ mod swap_integration_tests {
             wallet_address: "0xa9bd0493f9bd1f792a4aedc1f99d54535a75a46c38fd56a8f2c6b7c8d75817a1".to_string(),
             destination_address: "0xa9bd0493f9bd1f792a4aedc1f99d54535a75a46c38fd56a8f2c6b7c8d75817a1".to_string(),
             value: "1500000000".to_string(),
-            mode: SwapperMode::ExactIn,
             options,
         };
 
@@ -473,7 +471,6 @@ mod swap_integration_tests {
             wallet_address: "0x514BCb1F9AAbb904e6106Bd1052B66d2706dBbb7".to_string(),
             destination_address: "7g2rVN8fAAQdPh1mkajpvELqYa3gWvFXJsBLnKfEQfqy".to_string(),
             value: "1".to_string(), // 1 wei - too small
-            mode: SwapperMode::ExactIn,
             options,
         };
 
@@ -503,7 +500,6 @@ mod swap_integration_tests {
             wallet_address: "0x514BCb1F9AAbb904e6106Bd1052B66d2706dBbb7".to_string(),
             destination_address: "7g2rVN8fAAQdPh1mkajpvELqYa3gWvFXJsBLnKfEQfqy".to_string(),
             value: "50000000000000000".to_string(), // 0.05 ETH
-            mode: SwapperMode::ExactIn,
             options,
         };
 

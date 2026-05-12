@@ -5,7 +5,7 @@ use crate::{
 use async_trait::async_trait;
 use primitives::{AssetId, Chain, asset_constants::TON_USDT_TOKEN_ID};
 
-use super::{Options, Quote, QuoteRequest, SwapperMode};
+use super::{Options, Quote, QuoteRequest};
 
 pub const TEST_TON_WALLET_ADDRESS: &str = "UQAzoUpalAaXnVm5MoiYWRZguLFzY0KxFjLv3MkRq5BXz3VV";
 
@@ -47,7 +47,6 @@ impl QuoteRequest {
             wallet_address: "address".to_string(),
             destination_address: "address".to_string(),
             value: "1000000".to_string(),
-            mode: SwapperMode::ExactIn,
             options: Options::default(),
         }
     }
@@ -88,7 +87,6 @@ pub fn mock_quote(from_asset: SwapperQuoteAsset, to_asset: SwapperQuoteAsset) ->
         wallet_address: "0x514BCb1F9AAbb904e6106Bd1052B66d2706dBbb7".into(),
         destination_address: "0x514BCb1F9AAbb904e6106Bd1052B66d2706dBbb7".into(),
         value: "1000000".into(),
-        mode: SwapperMode::ExactIn,
         options: Options {
             slippage: SwapperSlippage {
                 mode: SwapperSlippageMode::Auto,
@@ -108,7 +106,6 @@ pub fn mock_ton(wallet_address: String) -> QuoteRequest {
         wallet_address: wallet_address.clone(),
         destination_address: wallet_address,
         value: "1000000000".to_string(),
-        mode: SwapperMode::ExactIn,
         options: Options {
             slippage: 100.into(),
             fee: Some(default_referral_fees()),

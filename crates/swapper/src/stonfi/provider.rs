@@ -318,7 +318,7 @@ mod tests {
 mod swap_integration_tests {
     use super::*;
     use crate::{
-        Options, SwapperMode, SwapperQuoteAsset,
+        Options, SwapperQuoteAsset,
         alien::reqwest_provider::NativeProvider,
         stonfi::testkit::NOT_TOKEN_ID,
         testkit::{TEST_TON_WALLET_ADDRESS, mock_ton},
@@ -357,7 +357,6 @@ mod swap_integration_tests {
             wallet_address: TEST_TON_WALLET_ADDRESS.to_string(),
             destination_address: TEST_TON_WALLET_ADDRESS.to_string(),
             value: "1000000000000".to_string(),
-            mode: SwapperMode::ExactIn,
             options: Options::new_with_slippage(100.into()),
         };
 

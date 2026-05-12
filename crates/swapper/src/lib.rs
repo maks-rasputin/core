@@ -54,7 +54,6 @@ pub(crate) use swapper_trait::Swapper;
 pub type SwapperProvider = primitives::SwapProvider;
 pub type SwapperProviderMode = primitives::swap::SwapProviderMode;
 pub type SwapperQuoteAsset = primitives::swap::QuoteAsset;
-pub type SwapperMode = primitives::swap::SwapMode;
 pub type SwapperSlippage = primitives::swap::Slippage;
 pub type SwapperSlippageMode = primitives::swap::SlippageMode;
 pub type SwapperQuoteData = primitives::swap::SwapQuoteData;

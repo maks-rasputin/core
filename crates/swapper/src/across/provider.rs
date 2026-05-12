@@ -798,7 +798,7 @@ mod tests {
     mod swap_integration_tests {
         use super::*;
         use crate::{
-            FetchQuoteData, NativeProvider, Options, QuoteRequest, SwapperError, SwapperMode,
+            FetchQuoteData, NativeProvider, Options, QuoteRequest, SwapperError,
             fees::{DEFAULT_STABLE_SWAP_REFERRAL_BPS, ReferralFee, ReferralFees},
         };
         use primitives::{AssetId, Chain, swap::SwapStatus};
@@ -824,7 +824,6 @@ mod tests {
                 wallet_address: "0x514BCb1F9AAbb904e6106Bd1052B66d2706dBbb7".into(),
                 destination_address: "0x514BCb1F9AAbb904e6106Bd1052B66d2706dBbb7".into(),
                 value: "20000000000000000".into(), // 0.02 ETH
-                mode: SwapperMode::ExactIn,
                 options,
             };
 
@@ -862,7 +861,6 @@ mod tests {
                 wallet_address: wallet.into(),
                 destination_address: wallet.into(),
                 value: "50000000".into(), // 50 USDC
-                mode: SwapperMode::ExactIn,
                 options,
             };
 

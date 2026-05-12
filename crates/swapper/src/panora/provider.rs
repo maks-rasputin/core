@@ -1,7 +1,7 @@
 use super::{client::PanoraClient, model};
 use crate::{
-    FetchQuoteData, ProviderData, ProviderType, Quote, QuoteRequest, Route, RpcClient, RpcProvider, Swapper, SwapperChainAsset, SwapperError, SwapperMode, SwapperProvider,
-    SwapperQuoteAsset, SwapperQuoteData,
+    FetchQuoteData, ProviderData, ProviderType, Quote, QuoteRequest, Route, RpcClient, RpcProvider, Swapper, SwapperChainAsset, SwapperError, SwapperProvider, SwapperQuoteAsset,
+    SwapperQuoteData,
     config::get_swap_api_url,
     fees::{ReferralFee, bps_to_percent_string, default_referral_fees, quote_value_after_reserve_by_chain},
 };
@@ -70,10 +70,6 @@ where
     }
 
     async fn get_quote(&self, request: &QuoteRequest) -> Result<Quote, SwapperError> {
-        if request.mode == SwapperMode::ExactOut {
-            return Err(SwapperError::NotSupportedAsset);
-        }
-
         let from_value = quote_value_after_reserve_by_chain(request)?;
         let response = self.client.get_quote(&Self::build_request(request, &from_value)?).await?;
         let quote = response.quotes.first().ok_or(SwapperError::NoQuoteAvailable)?;
@@ -139,7 +135,6 @@ mod tests {
             wallet_address: TEST_WALLET.to_string(),
             destination_address: TEST_WALLET.to_string(),
             value: "100000000".to_string(),
-            mode: SwapperMode::ExactIn,
             options: Options {
                 slippage: 100.into(),
                 fee: Some(default_referral_fees()),
@@ -200,7 +195,6 @@ mod swap_integration_tests {
             wallet_address: TEST_APTOS_WALLET.to_string(),
             destination_address: TEST_APTOS_WALLET.to_string(),
             value: "100000000".to_string(),
-            mode: SwapperMode::ExactIn,
             options: Options::new_with_slippage(100.into()),
         };
 
