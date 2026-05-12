@@ -9,6 +9,7 @@ use crate::proxy::request_url::RequestUrl;
 use crate::proxy::response_builder::ResponseBuilder;
 use crate::webhook::DynodeBroadcastWebhookClient;
 use gem_tracing::{DurationMs, info_with_fields};
+use primitives::Chain;
 use reqwest::header::HeaderMap;
 use reqwest::{Method, StatusCode};
 use settings_chain::BroadcastProviders;
@@ -196,7 +197,21 @@ impl JsonRpcHandler {
         client: &reqwest::Client,
         forward_headers: &HeaderMap,
     ) -> Result<(JsonRpcResult, u16, Vec<u8>), Box<dyn std::error::Error + Send + Sync>> {
-        let body = serde_json::to_vec(&call)?;
+        let upstream_call = if request.chain == Chain::Solana && call.method == "sendTransaction" {
+            let mut call = call.clone();
+            // TODO: Temporary dynode override for older app versions. Remove after clients send matching preflightCommitment.
+            if let serde_json::Value::Array(items) = &mut call.params {
+                if items.len() == 1 {
+                    items.push(serde_json::json!({ "preflightCommitment": "confirmed" }));
+                } else if let Some(serde_json::Value::Object(config)) = items.get_mut(1) {
+                    config.insert("preflightCommitment".to_string(), "confirmed".into());
+                }
+            }
+            call
+        } else {
+            call.clone()
+        };
+        let body = serde_json::to_vec(&upstream_call)?;
         let response = Self::send_jsonrpc_request(client, &request.method, url, body, forward_headers).await?;
         let status = response.status().as_u16();
         let body_bytes = response.bytes().await?.to_vec();
