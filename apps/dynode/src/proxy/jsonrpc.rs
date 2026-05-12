@@ -202,8 +202,12 @@ impl JsonRpcHandler {
             // TODO: Temporary dynode override for older app versions. Remove after clients send matching preflightCommitment.
             if let serde_json::Value::Array(items) = &mut call.params {
                 if items.len() == 1 {
-                    items.push(serde_json::json!({ "preflightCommitment": "confirmed" }));
+                    items.push(serde_json::json!({
+                        "encoding": "base64",
+                        "preflightCommitment": "confirmed"
+                    }));
                 } else if let Some(serde_json::Value::Object(config)) = items.get_mut(1) {
+                    config.entry("encoding".to_string()).or_insert_with(|| "base64".into());
                     config.insert("preflightCommitment".to_string(), "confirmed".into());
                 }
             }
