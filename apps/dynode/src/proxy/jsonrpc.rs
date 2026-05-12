@@ -189,6 +189,17 @@ impl JsonRpcHandler {
         Ok(client.execute(request).await?)
     }
 
+    // TODO: Temporary dynode override for older app versions. Remove after clients send matching preflightCommitment.
+    fn override_solana_send_transaction(call: &JsonRpcCall) -> JsonRpcCall {
+        let mut call = call.clone();
+        if let serde_json::Value::Array(items) = &mut call.params
+            && let Some(serde_json::Value::Object(config)) = items.get_mut(1)
+        {
+            config.insert("preflightCommitment".to_string(), "confirmed".into());
+        }
+        call
+    }
+
     async fn fetch_single_response(
         call: &JsonRpcCall,
         request: &ProxyRequest,
@@ -198,20 +209,7 @@ impl JsonRpcHandler {
         forward_headers: &HeaderMap,
     ) -> Result<(JsonRpcResult, u16, Vec<u8>), Box<dyn std::error::Error + Send + Sync>> {
         let upstream_call = if request.chain == Chain::Solana && call.method == "sendTransaction" {
-            let mut call = call.clone();
-            // TODO: Temporary dynode override for older app versions. Remove after clients send matching preflightCommitment.
-            if let serde_json::Value::Array(items) = &mut call.params {
-                if items.len() == 1 {
-                    items.push(serde_json::json!({
-                        "encoding": "base64",
-                        "preflightCommitment": "confirmed"
-                    }));
-                } else if let Some(serde_json::Value::Object(config)) = items.get_mut(1) {
-                    config.entry("encoding".to_string()).or_insert_with(|| "base64".into());
-                    config.insert("preflightCommitment".to_string(), "confirmed".into());
-                }
-            }
-            call
+            Self::override_solana_send_transaction(call)
         } else {
             call.clone()
         };
@@ -306,6 +304,41 @@ mod tests {
         let JsonRpcRequest::Batch(_) = batch_request else {
             panic!("Expected batch request");
         };
+    }
+
+    #[test]
+    fn test_override_solana_send_transaction() {
+        let old_client = JsonRpcCall {
+            jsonrpc: "2.0".into(),
+            method: "sendTransaction".into(),
+            params: json!(["tx", { "encoding": "base64", "skipPreflight": false }]),
+            id: 1,
+        };
+        let result = JsonRpcHandler::override_solana_send_transaction(&old_client);
+        assert_eq!(result.params[0], "tx");
+        assert_eq!(result.params[1]["encoding"], "base64");
+        assert_eq!(result.params[1]["skipPreflight"], false);
+        assert_eq!(result.params[1]["preflightCommitment"], "confirmed");
+
+        let new_client = JsonRpcCall {
+            jsonrpc: "2.0".into(),
+            method: "sendTransaction".into(),
+            params: json!(["tx", { "encoding": "base64", "skipPreflight": false, "preflightCommitment": "finalized" }]),
+            id: 1,
+        };
+        let result = JsonRpcHandler::override_solana_send_transaction(&new_client);
+        assert_eq!(result.params[1]["encoding"], "base64");
+        assert_eq!(result.params[1]["skipPreflight"], false);
+        assert_eq!(result.params[1]["preflightCommitment"], "confirmed");
+
+        let no_config = JsonRpcCall {
+            jsonrpc: "2.0".into(),
+            method: "sendTransaction".into(),
+            params: json!(["tx"]),
+            id: 1,
+        };
+        let result = JsonRpcHandler::override_solana_send_transaction(&no_config);
+        assert_eq!(result.params, json!(["tx"]));
     }
 
     #[test]
