@@ -1,4 +1,4 @@
-pub use crate::testkit::TEST_TON_WALLET_ADDRESS;
+pub use primitives::testkit::signer_mock::TEST_TON_SENDER;
 
 use super::{
     model::{Router, SwapSimulation},
@@ -35,10 +35,10 @@ impl<'a> SwapTransactionParams<'a> {
             to_native: false,
             sender_jetton_wallet: None,
             from_value: "1000000000",
-            wallet_address: Address::parse(TEST_TON_WALLET_ADDRESS).unwrap(),
-            receiver_address: Address::parse(TEST_TON_WALLET_ADDRESS).unwrap(),
+            wallet_address: Address::parse(TEST_TON_SENDER).unwrap(),
+            receiver_address: Address::parse(TEST_TON_SENDER).unwrap(),
             referral: ReferralParams {
-                address: Address::parse(TEST_TON_WALLET_ADDRESS).unwrap(),
+                address: Address::parse(TEST_TON_SENDER).unwrap(),
                 bps: 50,
             },
             deadline: Some(1_700_000_000),

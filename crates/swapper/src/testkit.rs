@@ -7,7 +7,6 @@ use primitives::{AssetId, Chain, asset_constants::TON_USDT_TOKEN_ID};
 
 use super::{Options, Quote, QuoteRequest};
 
-pub const TEST_TON_WALLET_ADDRESS: &str = "UQAzoUpalAaXnVm5MoiYWRZguLFzY0KxFjLv3MkRq5BXz3VV";
 
 impl ProviderData {
     pub fn mock() -> Self {

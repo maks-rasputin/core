@@ -321,15 +321,15 @@ mod swap_integration_tests {
         Options, SwapperQuoteAsset,
         alien::reqwest_provider::NativeProvider,
         stonfi::testkit::NOT_TOKEN_ID,
-        testkit::{TEST_TON_WALLET_ADDRESS, mock_ton},
+        testkit::mock_ton,
     };
-    use primitives::{AssetId, asset_constants::TON_USDT_ASSET_ID};
+    use primitives::{AssetId, asset_constants::TON_USDT_ASSET_ID, testkit::signer_mock::TEST_TON_SENDER};
 
     #[tokio::test]
     async fn test_stonfi_fetch_quote_and_quote_data_ton_to_usdt() -> Result<(), SwapperError> {
         let rpc_provider = Arc::new(NativeProvider::default());
         let provider = Stonfi::new(rpc_provider);
-        let request = mock_ton(TEST_TON_WALLET_ADDRESS.to_string());
+        let request = mock_ton(TEST_TON_SENDER.to_string());
 
         let quote = provider.get_quote(&request).await?;
         assert_eq!(quote.from_value, request.value);
@@ -354,8 +354,8 @@ mod swap_integration_tests {
         let request = QuoteRequest {
             from_asset: SwapperQuoteAsset::from(AssetId::from_token(Chain::Ton, NOT_TOKEN_ID)),
             to_asset: SwapperQuoteAsset::from(TON_USDT_ASSET_ID.clone()),
-            wallet_address: TEST_TON_WALLET_ADDRESS.to_string(),
-            destination_address: TEST_TON_WALLET_ADDRESS.to_string(),
+            wallet_address: TEST_TON_SENDER.to_string(),
+            destination_address: TEST_TON_SENDER.to_string(),
             value: "1000000000000".to_string(),
             options: Options::new_with_slippage(100.into()),
         };

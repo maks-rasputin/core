@@ -1,11 +1,11 @@
 use super::{
     client::OkxDexClient,
-    constants::{EVM_NATIVE_TOKEN_ADDRESS, SOLANA_NATIVE_TOKEN_ADDRESS, chain_index, dex_ids, evm_gas_limit},
+    constants::{BASE_URL, EVM_NATIVE_TOKEN_ADDRESS, SOLANA_NATIVE_TOKEN_ADDRESS, chain_index, dex_ids, evm_gas_limit},
     model::{OkxApiResponse, OkxClientConfig, QuoteData, QuoteParams, SwapParams, TransactionData},
 };
 use crate::{
     SwapperError,
-    alien::RpcProvider,
+    alien::{RpcClient, RpcProvider},
     approval::check_approval_erc20,
     fees::{bps_to_percent_string, default_referral_fees},
     models::ApprovalType,
@@ -33,18 +33,24 @@ where
     rpc_provider: Arc<dyn RpcProvider>,
 }
 
+impl OkxProvider<RpcClient> {
+    pub fn new(config: OkxClientConfig, rpc_provider: Arc<dyn RpcProvider>) -> Self {
+        Self::new_with_client(RpcClient::new(BASE_URL.to_string(), rpc_provider.clone()), config, rpc_provider)
+    }
+}
+
 impl<C> OkxProvider<C>
 where
     C: Client + Clone + Send + Sync + Debug + 'static,
 {
-    pub fn new(client: C, config: OkxClientConfig, rpc_provider: Arc<dyn RpcProvider>) -> Self {
+    pub fn new_with_client(client: C, config: OkxClientConfig, rpc_provider: Arc<dyn RpcProvider>) -> Self {
         Self {
             client: OkxDexClient::new(client, config),
             rpc_provider,
         }
     }
 
-    pub async fn compute_quote(&self, request: ProxyQuoteRequest) -> Result<ProxyQuote, SwapperError> {
+    pub async fn get_quote(&self, request: ProxyQuoteRequest) -> Result<ProxyQuote, SwapperError> {
         let chain = request.from_asset.chain();
         if request.to_asset.chain() != chain {
             return Err(SwapperError::NotSupportedChain);
@@ -75,7 +81,7 @@ where
         })
     }
 
-    pub async fn compute_quote_data(&self, quote: ProxyQuote) -> Result<SwapQuoteData, SwapperError> {
+    pub async fn get_quote_data(&self, quote: ProxyQuote) -> Result<SwapQuoteData, SwapperError> {
         let route: QuoteData = serde_json::from_value(quote.route_data.clone()).map_err(|_| SwapperError::InvalidRoute)?;
         let request = &quote.quote;
         let chain = request.from_asset.chain();
@@ -368,5 +374,48 @@ mod tests {
         assert_eq!(sol_params.fee_percent, "0.5");
         assert!(sol_params.from_token_referrer_wallet_address.is_some());
         assert!(sol_params.to_token_referrer_wallet_address.is_none());
+    }
+}
+
+#[cfg(all(test, feature = "swap_integration_tests"))]
+mod swap_integration_tests {
+    use super::*;
+    use crate::alien::reqwest_provider::NativeProvider;
+    use primitives::{AssetId, asset_constants::SOLANA_USDC_ASSET_ID, swap::QuoteAsset, testkit::signer_mock::TEST_SOLANA_SENDER};
+
+    fn okx_provider() -> OkxProvider<RpcClient> {
+        let settings = settings::testkit::get_test_settings();
+        let config = OkxClientConfig {
+            api_key: settings.swap.okx.key.public,
+            secret_key: settings.swap.okx.key.secret,
+            passphrase: settings.swap.okx.passphrase,
+            project: settings.swap.okx.project,
+        };
+        OkxProvider::new(config, Arc::new(NativeProvider::default()))
+    }
+
+    #[tokio::test]
+    async fn test_okx_fetch_quote_and_quote_data_sol_to_usdc() -> Result<(), SwapperError> {
+        let provider = okx_provider();
+        let request = ProxyQuoteRequest {
+            from_address: TEST_SOLANA_SENDER.to_string(),
+            to_address: TEST_SOLANA_SENDER.to_string(),
+            from_asset: QuoteAsset::from(AssetId::from_chain(Chain::Solana)),
+            to_asset: QuoteAsset::from(SOLANA_USDC_ASSET_ID.clone()),
+            from_value: "100000000".to_string(),
+            referral_bps: 50,
+            slippage_bps: 300,
+            use_max_amount: false,
+        };
+
+        let quote = provider.get_quote(request).await?;
+        assert!(quote.output_value.parse::<u64>().unwrap() > 0);
+        assert!(quote.output_min_value.parse::<u64>().unwrap() > 0);
+
+        let quote_data = provider.get_quote_data(quote).await?;
+        assert!(!quote_data.to.is_empty());
+        assert_eq!(quote_data.value, "0");
+        assert!(!quote_data.data.is_empty());
+        Ok(())
     }
 }

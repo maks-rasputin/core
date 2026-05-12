@@ -51,7 +51,8 @@ use settings::Settings;
 use settings_chain::{ChainProviders, ProviderFactory};
 use storage::Database;
 use streamer::{StreamProducer, StreamProducerConfig};
-use swap::{OkxApiClient, SwapClient};
+use swap::SwapClient;
+use swapper::okx::{OkxClientConfig, OkxProvider};
 use swapper::swapper::GemSwapper;
 use webhooks::WebhooksClient;
 use websocket_prices::PriceObserverConfig;
@@ -234,8 +235,8 @@ async fn rocket_api(settings: Settings) -> Result<Rocket<Build>, Box<dyn std::er
     let redemption_client = RewardsRedemptionClient::new(database.clone(), stream_producer.clone());
     let notifications_client = NotificationsClient::new(database.clone());
     let near_intents_client = swap::NearIntentsProxyClient::new(cacher_client.clone());
-    let okx_api_client = OkxApiClient::new(
-        swapper::okx::OkxClientConfig {
+    let okx_provider = OkxProvider::new(
+        OkxClientConfig {
             api_key: settings.swap.okx.key.public.clone(),
             secret_key: settings.swap.okx.key.secret.clone(),
             passphrase: settings.swap.okx.passphrase.clone(),
@@ -276,7 +277,7 @@ async fn rocket_api(settings: Settings) -> Result<Rocket<Build>, Box<dyn std::er
         .manage(Mutex::new(wallets_client))
         .manage(Mutex::new(notifications_client))
         .manage(Mutex::new(near_intents_client))
-        .manage(okx_api_client)
+        .manage(okx_provider)
         .manage(Mutex::new(portfolio_client))
         .manage(auth_client)
         .manage(stream_producer);
