@@ -19,7 +19,7 @@ pub struct PriceRow {
     pub provider: PriceProviderRow,
     pub provider_price_id: String,
     pub price: f64,
-    pub price_change_percentage_24h: f64,
+    pub price_change_percentage_24h: Option<f64>,
     pub all_time_high: f64,
     pub all_time_high_date: Option<NaiveDateTime>,
     pub all_time_low: f64,
@@ -37,7 +37,7 @@ pub struct NewPriceRow {
     pub provider: PriceProviderRow,
     pub provider_price_id: String,
     pub price: f64,
-    pub price_change_percentage_24h: f64,
+    pub price_change_percentage_24h: Option<f64>,
     pub all_time_high: f64,
     pub all_time_high_date: Option<NaiveDateTime>,
     pub all_time_low: f64,
@@ -95,7 +95,7 @@ impl NewPriceRow {
             provider: provider.into(),
             provider_price_id,
             price: price.unwrap_or(0.0),
-            price_change_percentage_24h: price_change_percentage_24h.unwrap_or(0.0),
+            price_change_percentage_24h: price_change_percentage_24h.filter(|_| provider.supports_price_change_24h()),
             all_time_high: market.and_then(|m| m.all_time_high).unwrap_or(0.0),
             all_time_high_date: market.and_then(|m| m.all_time_high_date).map(|d| d.naive_utc()),
             all_time_low: market.and_then(|m| m.all_time_low).unwrap_or(0.0),
@@ -151,7 +151,7 @@ impl Hash for PriceRow {
 
 impl PriceRow {
     pub fn with_price(provider: PriceProvider, provider_price_id: String, price: f64) -> Self {
-        Self::new(provider, provider_price_id, price, 0.0, 0.0, None, 0.0, None, None, None, chrono::Utc::now().naive_utc())
+        Self::new(provider, provider_price_id, price, None, 0.0, None, 0.0, None, None, None, chrono::Utc::now().naive_utc())
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -159,7 +159,7 @@ impl PriceRow {
         provider: PriceProvider,
         provider_price_id: String,
         price: f64,
-        price_change_percentage_24h: f64,
+        price_change_percentage_24h: Option<f64>,
         all_time_high: f64,
         all_time_high_date: Option<NaiveDateTime>,
         all_time_low: f64,
@@ -247,7 +247,7 @@ impl PriceRow {
     }
 
     pub fn as_primitive(&self) -> Price {
-        Price::new(self.price, self.price_change_percentage_24h, self.last_updated_at.and_utc(), self.provider_value())
+        Price::new(self.price, self.price_change_percentage_24h.unwrap_or(0.0), self.last_updated_at.and_utc(), self.provider_value())
     }
 
     pub fn as_market_primitive(&self, asset: &AssetRow) -> AssetMarket {
@@ -304,7 +304,7 @@ impl PriceRow {
             provider: self.provider_value(),
             provider_price_id: self.provider_price_id.clone(),
             price: self.price,
-            price_change_percentage_24h: self.price_change_percentage_24h,
+            price_change_percentage_24h: self.price_change_percentage_24h.unwrap_or(0.0),
             all_time_high: self.all_time_high,
             all_time_high_date: self.all_time_high_date.map(|d| d.and_utc()),
             all_time_low: self.all_time_low,
@@ -321,7 +321,7 @@ impl PriceRow {
             provider: data.provider.into(),
             provider_price_id: data.provider_price_id,
             price: data.price,
-            price_change_percentage_24h: data.price_change_percentage_24h,
+            price_change_percentage_24h: data.provider.supports_price_change_24h().then_some(data.price_change_percentage_24h),
             all_time_high: data.all_time_high,
             all_time_high_date: data.all_time_high_date.map(|d| d.naive_utc()),
             all_time_low: data.all_time_low,
@@ -343,7 +343,7 @@ mod tests {
     }
 
     fn row(price: f64, ath: f64, ath_d: Option<NaiveDateTime>, atl: f64, atl_d: Option<NaiveDateTime>) -> PriceRow {
-        PriceRow::new(PriceProvider::Pyth, "x".into(), price, 0.0, ath, ath_d, atl, atl_d, None, None, ts(1000))
+        PriceRow::new(PriceProvider::Pyth, "x".into(), price, None, ath, ath_d, atl, atl_d, None, None, ts(1000))
     }
 
     #[test]

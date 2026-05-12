@@ -13,7 +13,7 @@ CREATE TABLE prices (
     provider VARCHAR(32) NOT NULL REFERENCES prices_providers (id) ON DELETE CASCADE,
     provider_price_id VARCHAR(256) NOT NULL,
     price float NOT NULL DEFAULT 0,
-    price_change_percentage_24h float NOT NULL DEFAULT 0,
+    price_change_percentage_24h float,
     market_cap_rank INTEGER,
     last_updated_at timestamp NOT NULL default current_timestamp,
     updated_at timestamp NOT NULL default current_timestamp,
