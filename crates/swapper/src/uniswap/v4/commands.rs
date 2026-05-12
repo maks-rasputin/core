@@ -172,7 +172,6 @@ mod tests {
                     bps: 50,
                     address: "0x0D9DAB1A248f63B0a48965bA8435e4de7497a3dC".into(),
                 })),
-                preferred_providers: vec![],
                 use_max_amount: false,
             },
         };

@@ -288,7 +288,6 @@ mod tests {
                     mode: SwapperSlippageMode::Exact,
                 },
                 fee,
-                preferred_providers: vec![],
                 use_max_amount: false,
             },
         }

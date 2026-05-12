@@ -138,7 +138,6 @@ mod tests {
             options: Options {
                 slippage: 100.into(),
                 fee: Some(default_referral_fees()),
-                preferred_providers: vec![],
                 use_max_amount: false,
             },
         }

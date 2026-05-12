@@ -81,7 +81,7 @@ impl AssetPriceFull {
     pub fn as_price_data(&self) -> PriceData {
         let market = self.market.clone().unwrap_or_default();
         PriceData {
-            id: PriceId::id_for(self.price.provider, &self.mapping.provider_price_id),
+            id: PriceId::new(self.price.provider, self.mapping.provider_price_id.clone()),
             provider: self.price.provider,
             provider_price_id: self.mapping.provider_price_id.clone(),
             price: self.price.price,

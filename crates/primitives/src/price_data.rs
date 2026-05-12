@@ -1,11 +1,11 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::PriceProvider;
+use crate::{PriceId, PriceProvider};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PriceData {
-    pub id: String,
+    pub id: PriceId,
     pub provider: PriceProvider,
     pub provider_price_id: String,
     pub price: f64,

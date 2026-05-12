@@ -93,7 +93,6 @@ pub fn mock_quote(from_asset: SwapperQuoteAsset, to_asset: SwapperQuoteAsset) ->
                 bps: 50,
             },
             fee: Some(config.referral_fee.clone()),
-            preferred_providers: vec![],
             use_max_amount: false,
         },
     }
@@ -109,7 +108,6 @@ pub fn mock_ton(wallet_address: String) -> QuoteRequest {
         options: Options {
             slippage: 100.into(),
             fee: Some(default_referral_fees()),
-            preferred_providers: vec![],
             use_max_amount: false,
         },
     }

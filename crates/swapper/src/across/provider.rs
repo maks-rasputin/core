@@ -814,7 +814,6 @@ mod tests {
                     bps: DEFAULT_STABLE_SWAP_REFERRAL_BPS,
                     address: "0x0D9DAB1A248f63B0a48965bA8435e4de7497a3dC".into(),
                 })),
-                preferred_providers: vec![],
                 use_max_amount: false,
             };
 
@@ -848,7 +847,6 @@ mod tests {
             let options = Options {
                 slippage: 100.into(),
                 fee: None,
-                preferred_providers: vec![],
                 use_max_amount: false,
             };
 
