@@ -1,11 +1,9 @@
+use std::collections::HashMap;
+
 use num_bigint::BigUint;
+use primitives::TransactionState;
 use serde::{Deserialize, Serialize};
 use serde_serializers::deserialize_biguint_from_str;
-
-pub trait HasMemo {
-    fn comment(&self) -> &Option<String>;
-    fn decoded_body(&self) -> &Option<DecodedBody>;
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DecodedBody {
@@ -18,6 +16,111 @@ pub struct DecodedBody {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MessageTransactions {
     pub transactions: Vec<TransactionMessage>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TraceResponse {
+    pub traces: Vec<Trace>,
+}
+
+impl TraceResponse {
+    pub fn root_transaction(&self) -> Option<&TransactionMessage> {
+        self.traces.first()?.root_transaction()
+    }
+
+    pub fn action_state(&self) -> Option<TransactionState> {
+        self.traces.first().map(Trace::action_state)
+    }
+
+    pub fn has_actions(&self) -> bool {
+        self.traces.first().is_some_and(Trace::has_actions)
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct TraceByMessageQuery {
+    pub msg_hash: String,
+    pub include_actions: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TraceByTransactionQuery {
+    pub tx_hash: String,
+    pub include_actions: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TraceByBlockQuery {
+    pub mc_seqno: u64,
+    pub include_actions: bool,
+    pub limit: usize,
+    pub offset: usize,
+    pub sort: &'static str,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TraceByAddressQuery {
+    pub account: String,
+    pub include_actions: bool,
+    pub limit: usize,
+    pub offset: usize,
+    pub sort: &'static str,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Trace {
+    pub is_incomplete: bool,
+    pub actions: Vec<TraceAction>,
+    pub transactions_order: Vec<String>,
+    pub transactions: HashMap<String, TransactionMessage>,
+}
+
+impl Trace {
+    pub fn root_transaction(&self) -> Option<&TransactionMessage> {
+        let transaction_id = self.transactions_order.first()?;
+        self.transactions.get(transaction_id)
+    }
+
+    pub fn has_actions(&self) -> bool {
+        !self.actions.is_empty()
+    }
+
+    pub fn action_state(&self) -> TransactionState {
+        if self.is_incomplete {
+            return TransactionState::Pending;
+        }
+        for action in &self.actions {
+            if action.success == Some(false) {
+                return TransactionState::Reverted;
+            }
+        }
+        TransactionState::Confirmed
+    }
+}
+
+pub const TRACE_ACTION_JETTON_SWAP: &str = "jetton_swap";
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TraceAction {
+    pub success: Option<bool>,
+    #[serde(rename = "type")]
+    pub action_type: Option<String>,
+    pub details: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct JettonSwapDetails {
+    pub dex: Option<String>,
+    pub sender: String,
+    pub asset_in: Option<String>,
+    pub asset_out: Option<String>,
+    pub dex_incoming_transfer: SwapTransfer,
+    pub dex_outgoing_transfer: SwapTransfer,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SwapTransfer {
+    pub amount: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -37,53 +140,16 @@ pub struct OutMessage {
     pub destination: Option<String>,
     pub value: Option<String>,
     pub op_code: Option<String>,
-    pub decoded_op_name: Option<String>,
-    pub body: Option<String>,
     pub comment: Option<String>,
     pub decoded_body: Option<DecodedBody>,
-}
-
-impl HasMemo for OutMessage {
-    fn comment(&self) -> &Option<String> {
-        &self.comment
-    }
-
-    fn decoded_body(&self) -> &Option<DecodedBody> {
-        &self.decoded_body
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct InMessage {
-    pub hash: String,
-    pub msg_type: Option<String>,
-    pub value: Option<String>,
-    pub source: Option<String>,
-    pub destination: Option<String>,
-    pub body: Option<String>,
-    pub comment: Option<String>,
-    pub decoded_body: Option<DecodedBody>,
-}
-
-impl HasMemo for InMessage {
-    fn comment(&self) -> &Option<String> {
-        &self.comment
-    }
-
-    fn decoded_body(&self) -> &Option<DecodedBody> {
-        &self.decoded_body
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransactionInMessage {
-    pub hash: String,
     pub source: Option<String>,
     pub destination: String,
     pub value: Option<String>,
     pub opcode: Option<String>,
-    pub bounce: Option<bool>,
-    pub bounced: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

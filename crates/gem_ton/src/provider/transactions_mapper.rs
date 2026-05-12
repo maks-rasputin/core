@@ -1,9 +1,10 @@
 use crate::address::Address;
+use crate::address::hex_to_base64_address;
 use crate::constants::FAILED_OPERATION_OPCODES;
-use crate::models::{BroadcastTransaction, HasMemo, TransactionMessage};
+use crate::models::{BroadcastTransaction, JettonSwapDetails, OutMessage, TRACE_ACTION_JETTON_SWAP, Trace, TraceAction, TransactionMessage};
 use chrono::DateTime;
 use gem_encoding::decode_base64;
-use primitives::{Address as AddressTrait, Transaction, TransactionState, TransactionType, chain::Chain};
+use primitives::{AssetId, Transaction, TransactionState, TransactionSwapMetadata, TransactionType, chain::Chain};
 use std::error::Error;
 
 pub fn map_transaction_broadcast(broadcast_result: BroadcastTransaction) -> Result<String, Box<dyn Error + Sync + Send>> {
@@ -17,7 +18,6 @@ pub(crate) fn map_transaction_state(transaction: &TransactionMessage) -> Transac
             return TransactionState::Failed;
         }
         if let Some(compute_phase) = &description.compute_ph {
-            // If success is None or false, or if exit_code indicates failure
             if !compute_phase.success.unwrap_or(false) {
                 return TransactionState::Failed;
             }
@@ -39,11 +39,6 @@ pub(crate) fn map_transaction_state(transaction: &TransactionMessage) -> Transac
         return TransactionState::Failed;
     }
 
-    // TODO: Check for bounce/bounced fields when available in OutMessage struct
-    // if transaction.out_msgs.iter().any(|msg| msg.bounce && msg.bounced) {
-    //     return TransactionState::Failed;
-    // }
-
     if let Some(in_msg) = &transaction.in_msg
         && let Some(opcode) = &in_msg.opcode
         && FAILED_OPERATION_OPCODES.contains(&opcode.as_str())
@@ -54,17 +49,65 @@ pub(crate) fn map_transaction_state(transaction: &TransactionMessage) -> Transac
     TransactionState::Confirmed
 }
 
-pub fn map_transactions(transactions: Vec<TransactionMessage>) -> Vec<Transaction> {
-    transactions.into_iter().filter_map(map_transaction_message).collect()
+pub(crate) fn base64_hash_to_hex(base64_hash: &str) -> Option<String> {
+    decode_base64(base64_hash).ok().map(hex::encode)
 }
 
-fn map_transaction_message(transaction: TransactionMessage) -> Option<Transaction> {
-    let asset_id = Chain::Ton.as_asset_id();
-    let state = map_transaction_state(&transaction);
-    let created_at = DateTime::from_timestamp(transaction.now, 0)?;
-    let hash = transaction.hash.clone();
+pub fn map_trace_transactions(traces: Vec<Trace>) -> Vec<Transaction> {
+    traces.into_iter().filter_map(map_root_trace_transaction).collect()
+}
 
-    // Handle outgoing transfers (with out messages)
+fn map_root_trace_transaction(trace: Trace) -> Option<Transaction> {
+    let state = if trace.is_incomplete || trace.has_actions() {
+        Some(trace.action_state())
+    } else {
+        None
+    };
+    let swap = jetton_swap(&trace.actions);
+    let mut transactions = trace.transactions;
+    let root_hash = trace.transactions_order.into_iter().next()?;
+    let root = transactions.remove(&root_hash)?;
+    let mut transaction = map_transaction_message_with_state(root, state)?;
+    if let Some((sender, metadata)) = swap
+        && let Ok(value) = serde_json::to_value(metadata)
+    {
+        transaction.transaction_type = TransactionType::Swap;
+        transaction.from = sender.clone();
+        transaction.to = sender;
+        transaction.metadata = Some(value);
+    }
+    Some(transaction)
+}
+
+fn jetton_swap(actions: &[TraceAction]) -> Option<(String, TransactionSwapMetadata)> {
+    let action = actions
+        .iter()
+        .find(|action| action.action_type.as_deref() == Some(TRACE_ACTION_JETTON_SWAP) && action.success == Some(true))?;
+    let details: JettonSwapDetails = serde_json::from_value(action.details.clone()?).ok()?;
+    let sender = parse_address(&details.sender)?;
+    let metadata = TransactionSwapMetadata {
+        from_asset: ton_asset_id(details.asset_in.as_deref())?,
+        from_value: details.dex_incoming_transfer.amount,
+        to_asset: ton_asset_id(details.asset_out.as_deref())?,
+        to_value: details.dex_outgoing_transfer.amount,
+        provider: details.dex,
+    };
+    Some((sender, metadata))
+}
+
+fn ton_asset_id(raw_address: Option<&str>) -> Option<AssetId> {
+    match raw_address {
+        None => Some(AssetId::from_chain(Chain::Ton)),
+        Some(hex_address) => hex_to_base64_address(hex_address).map(|token_id| AssetId::from_token(Chain::Ton, &token_id)),
+    }
+}
+
+fn map_transaction_message_with_state(transaction: TransactionMessage, state: Option<TransactionState>) -> Option<Transaction> {
+    let asset_id = Chain::Ton.as_asset_id();
+    let state = state.unwrap_or_else(|| map_transaction_state(&transaction));
+    let created_at = DateTime::from_timestamp(transaction.now, 0)?;
+    let hash = base64_hash_to_hex(&transaction.hash)?;
+
     if transaction.out_msgs.len() == 1 && is_simple_transfer(transaction.out_msgs.first()?) {
         let out_message = transaction.out_msgs.first()?;
         let from = parse_address(&out_message.source)?;
@@ -92,7 +135,6 @@ fn map_transaction_message(transaction: TransactionMessage) -> Option<Transactio
         ));
     }
 
-    // Handle incoming transfers (with in message but no out messages)
     if transaction.out_msgs.is_empty()
         && let Some(in_msg) = &transaction.in_msg
         && let (Some(value), Some(source)) = (&in_msg.value, &in_msg.source)
@@ -113,7 +155,7 @@ fn map_transaction_message(transaction: TransactionMessage) -> Option<Transactio
             transaction.total_fees.to_string(),
             asset_id,
             value.clone(),
-            None, // TransactionInMessage doesn't have memo fields
+            None,
             None,
             created_at,
         ));
@@ -123,7 +165,7 @@ fn map_transaction_message(transaction: TransactionMessage) -> Option<Transactio
 }
 
 fn parse_address(address: &str) -> Option<String> {
-    Address::try_parse_hex(address).map(|a| a.encode())
+    Address::try_parse_hex(address).map(|a| a.encode_non_bounceable())
 }
 
 fn is_simple_transfer(out_message: &crate::models::OutMessage) -> bool {
@@ -133,14 +175,14 @@ fn is_simple_transfer(out_message: &crate::models::OutMessage) -> bool {
     }
 }
 
-fn extract_memo<T: HasMemo>(message: &T) -> Option<String> {
-    if let Some(comment) = message.comment()
+fn extract_memo(message: &OutMessage) -> Option<String> {
+    if let Some(comment) = &message.comment
         && !comment.is_empty()
     {
         return Some(comment.clone());
     }
 
-    if let Some(decoded_body) = message.decoded_body() {
+    if let Some(decoded_body) = &message.decoded_body {
         if let Some(text) = &decoded_body.text
             && !text.is_empty()
         {
@@ -159,8 +201,8 @@ fn extract_memo<T: HasMemo>(message: &T) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::MessageTransactions;
-    use crate::provider::testkit::TEST_TRANSACTION_ID;
+    use crate::models::{MessageTransactions, TraceResponse};
+    use crate::provider::testkit::{FAILED_SWAP_ROOT_TRANSACTION_HEX_HASH, SUCCESS_SWAP_ROOT_TRANSACTION_HEX_HASH, TEST_TRANSACTION_ID};
 
     #[test]
     fn test_transaction_transfer_state_success() {
@@ -182,17 +224,6 @@ mod tests {
 
         let state = map_transaction_state(transaction);
         assert_eq!(state, TransactionState::Confirmed);
-    }
-
-    #[test]
-    fn test_map_transaction_by_hash() {
-        let transactions: MessageTransactions = serde_json::from_str(include_str!("../../testdata/transaction_status_response.json")).unwrap();
-        let transaction = map_transactions(transactions.transactions).into_iter().next().unwrap();
-
-        assert_eq!(transaction.hash, TEST_TRANSACTION_ID);
-        assert_eq!(transaction.transaction_type, TransactionType::Transfer);
-        assert_eq!(transaction.state, TransactionState::Confirmed);
-        assert_eq!(transaction.created_at.timestamp(), 1755574728);
     }
 
     #[test]
@@ -269,20 +300,38 @@ mod tests {
     }
 
     #[test]
-    fn test_map_get_transactions_by_block() {
-        let block_transactions: MessageTransactions = serde_json::from_str(include_str!("../../testdata/block_transactions.json")).unwrap();
+    fn test_map_trace_transactions_jetton_swap() {
+        let traces = TraceResponse::mock_jetton_swap();
+        let transactions = map_trace_transactions(traces.traces);
 
-        assert_eq!(block_transactions.transactions.len(), 18);
+        assert_eq!(transactions.len(), 1);
+        let transaction = &transactions[0];
+        assert_eq!(transaction.transaction_type, TransactionType::Swap);
+        assert_eq!(transaction.state, TransactionState::Confirmed);
+        assert_eq!(transaction.from, "UQAzoUpalAaXnVm5MoiYWRZguLFzY0KxFjLv3MkRq5BXz3VV");
+        assert_eq!(transaction.from, transaction.to);
 
-        let transactions = map_transactions(block_transactions.transactions);
+        let metadata = transaction.metadata.as_ref().expect("swap metadata");
+        let swap: TransactionSwapMetadata = serde_json::from_value(metadata.clone()).unwrap();
+        assert_eq!(swap.from_asset, AssetId::from_chain(Chain::Ton));
+        assert_eq!(swap.from_value, "1000000000");
+        assert_eq!(swap.to_asset.chain, Chain::Ton);
+        assert!(swap.to_asset.token_id.is_some());
+        assert_eq!(swap.to_value, "2436222");
+        assert_eq!(swap.provider.as_deref(), Some("stonfi_v2"));
+    }
 
-        assert!(!transactions.is_empty());
-        assert!(transactions.len() < 18);
+    #[test]
+    fn test_map_trace_transactions_by_block() {
+        let traces = TraceResponse::mock_block_traces();
 
-        for transaction in &transactions {
-            assert!(!transaction.id.hash.is_empty());
-            assert!(!transaction.from.is_empty());
-            assert!(!transaction.to.is_empty());
-        }
+        assert_eq!(traces.traces.len(), 2);
+
+        let transactions = map_trace_transactions(traces.traces);
+        let hashes = transactions.iter().map(|transaction| transaction.hash.as_str()).collect::<Vec<_>>();
+
+        assert_eq!(hashes, vec![SUCCESS_SWAP_ROOT_TRANSACTION_HEX_HASH, FAILED_SWAP_ROOT_TRANSACTION_HEX_HASH]);
+        assert_eq!(transactions[0].state, TransactionState::Confirmed);
+        assert_eq!(transactions[1].state, TransactionState::Reverted);
     }
 }
