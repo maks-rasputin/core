@@ -31,14 +31,12 @@ impl NFTClient {
     }
 
     pub async fn update_collection(&self, collection_id: &str) -> Result<bool, Box<dyn Error + Send + Sync>> {
-        let collection_id = NFTCollectionId::from_id(collection_id).ok_or_else(|| format!("invalid NFT collection id: {}", collection_id))?;
-        self.refresh_collection(collection_id).await?;
+        self.refresh_collection(collection_id.parse()?).await?;
         Ok(true)
     }
 
     pub async fn update_asset(&self, asset_id: &str) -> Result<bool, Box<dyn Error + Send + Sync>> {
-        let asset_id = NFTAssetId::from_id(asset_id).ok_or_else(|| format!("invalid NFT asset id: {}", asset_id))?;
-        self.refresh_asset(asset_id).await?;
+        self.refresh_asset(asset_id.parse()?).await?;
         Ok(true)
     }
 
@@ -74,7 +72,7 @@ impl NFTClient {
 
     pub fn get_nft_asset_data(&self, asset_id: NFTAssetId) -> Result<NFTAssetData, Box<dyn Error + Send + Sync>> {
         let asset = self.with_urls_asset(self.load_nft_asset(&asset_id.to_string())?);
-        let collection = self.with_urls_collection(self.load_nft_collection(&asset.collection_id)?);
+        let collection = self.with_urls_collection(self.load_nft_collection(&asset.collection_id.to_string())?);
 
         Ok(NFTAssetData { collection, asset })
     }
@@ -85,7 +83,7 @@ impl NFTClient {
             .get_nft_data(chain, address)
             .await?
             .into_iter()
-            .flat_map(|d| d.assets.into_iter().filter_map(|a| NFTAssetId::from_id(&a.id)))
+            .flat_map(|d| d.assets.into_iter().map(|a| a.id))
             .collect())
     }
 
@@ -96,18 +94,19 @@ impl NFTClient {
             .get_nft_assets_by_filter(vec![NftAssetFilter::AddressId(address_id)])?
             .into_iter()
             .filter(|row| row.chain.0 == chain)
-            .filter_map(|row| NFTAssetId::from_id(&row.identifier))
+            .map(|row| row.identifier.0)
             .collect())
     }
 
     fn with_urls_asset(&self, asset: NFTAsset) -> NFTAsset {
-        let preview_url = ImageFormatter::get_nft_asset_url(&self.assets_url, &asset.id);
-        let resource_url = ImageFormatter::get_nft_asset_resource_url(&self.assets_url, &asset.id);
+        let id = asset.id.to_string();
+        let preview_url = ImageFormatter::get_nft_asset_url(&self.assets_url, &id);
+        let resource_url = ImageFormatter::get_nft_asset_resource_url(&self.assets_url, &id);
         asset.with_urls(preview_url, resource_url)
     }
 
     fn with_urls_collection(&self, collection: NFTCollection) -> NFTCollection {
-        let preview_url = ImageFormatter::get_nft_collection_url(&self.assets_url, &collection.id);
+        let preview_url = ImageFormatter::get_nft_collection_url(&self.assets_url, &collection.id.to_string());
         collection.with_preview_url(preview_url)
     }
 
@@ -138,11 +137,11 @@ impl NFTClient {
     }
 
     pub async fn preload_collections(&self, collection_ids: Vec<NFTCollectionId>) -> Result<HashMap<String, i32>, Box<dyn Error + Send + Sync>> {
-        let identifiers: Vec<String> = collection_ids.iter().map(|x| x.id()).collect();
+        let identifiers: Vec<String> = collection_ids.iter().map(|x| x.to_string()).collect();
         let existing = self.get_nft_collection_id_map(&identifiers)?;
 
         let mut new_collections: Vec<NFTCollection> = Vec::new();
-        for id in collection_ids.into_iter().filter(|id| !existing.contains_key(&id.id())) {
+        for id in collection_ids.into_iter().filter(|id| !existing.contains_key(&id.to_string())) {
             if let Ok(collection) = self.provider_client.get_nft_collection(id).await {
                 new_collections.push(collection);
             }
@@ -160,7 +159,7 @@ impl NFTClient {
         let links: Vec<NftLinkRow> = new_collections
             .into_iter()
             .flat_map(|collection| {
-                let pk = map.get(&collection.id).copied();
+                let pk = map.get(&collection.id.to_string()).copied();
                 collection
                     .links
                     .into_iter()
@@ -186,7 +185,7 @@ impl NFTClient {
 
         let rows: Vec<NewNftAssetRow> = new_assets
             .into_iter()
-            .filter_map(|asset| collection_id_map.get(&asset.collection_id).map(|&pk| NewNftAssetRow::from_primitive(asset, pk)))
+            .filter_map(|asset| collection_id_map.get(&asset.collection_id.to_string()).map(|&pk| NewNftAssetRow::from_primitive(asset, pk)))
             .collect();
 
         if rows.is_empty() {
@@ -203,7 +202,7 @@ impl NFTClient {
             .nft()?
             .get_nft_collections_by_filter(vec![NftCollectionFilter::Identifiers(identifiers.to_vec())])?
             .into_iter()
-            .map(|c| (c.identifier, c.id))
+            .map(|c| (c.identifier.to_string(), c.id))
             .collect())
     }
 
@@ -213,25 +212,25 @@ impl NFTClient {
             .nft()?
             .get_nft_assets_by_filter(vec![NftAssetFilter::Identifiers(identifiers.to_vec())])?
             .into_iter()
-            .map(|a| (a.identifier, a.id))
+            .map(|a| (a.identifier.to_string(), a.id))
             .collect())
     }
 
     fn load_nft_assets(&self, asset_identifiers: Vec<String>) -> Result<Vec<NFTAsset>, Box<dyn Error + Send + Sync>> {
         let assets = self.database.nft()?.get_nft_assets_by_filter(vec![NftAssetFilter::Identifiers(asset_identifiers)])?;
         let collection_ids: Vec<i32> = assets.iter().map(|a| a.collection_id).collect::<HashSet<_>>().into_iter().collect();
-        let collection_identifiers: HashMap<i32, String> = self
+        let collection_identifiers: HashMap<i32, primitives::NFTCollectionId> = self
             .database
             .nft()?
             .get_nft_collections_by_filter(vec![NftCollectionFilter::Ids(collection_ids)])?
             .into_iter()
-            .map(|c| (c.id, c.identifier))
+            .map(|c| (c.id, c.identifier.0))
             .collect();
         Ok(assets
             .into_iter()
-            .map(|row| {
-                let identifier = collection_identifiers.get(&row.collection_id).cloned().unwrap_or_default();
-                row.as_primitive(identifier)
+            .filter_map(|row| {
+                let identifier = collection_identifiers.get(&row.collection_id).cloned()?;
+                Some(row.as_primitive(identifier.into()))
             })
             .collect())
     }
@@ -245,7 +244,7 @@ impl NFTClient {
         by_collection
             .into_iter()
             .map(|(collection_id, asset_ids)| {
-                let collection = self.load_nft_collection(&collection_id.id())?;
+                let collection = self.load_nft_collection(&collection_id.to_string())?;
                 let assets = self.load_nft_assets(asset_ids.into_iter().map(|x| x.to_string()).collect())?;
                 Ok(self.with_urls_data(NFTData { collection, assets }))
             })

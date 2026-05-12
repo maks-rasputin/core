@@ -2,6 +2,9 @@
 
 pub type UInt64 = u64;
 
+#[macro_use]
+pub mod string_serde;
+
 pub mod localize;
 pub use self::localize::Localize;
 

@@ -67,7 +67,7 @@ impl Pusher {
             TransactionType::TransferNFT => {
                 let metadata = transaction.metadata.clone().ok_or("Missing metadata")?;
                 let metadata: TransactionNFTTransferMetadata = serde_json::from_value(metadata)?;
-                let nft_asset_id = NFTAssetId::from_id(&metadata.asset_id.clone()).ok_or("Missing nft asset id")?;
+                let nft_asset_id: NFTAssetId = metadata.asset_id.parse().map_err(|_| "Missing nft asset id")?;
                 let name = if let Some(name) = metadata.name {
                     name
                 } else if nft_asset_id.token_id.len() < 6 {

@@ -1,7 +1,7 @@
 use crate::{
     Chain, NFTType,
     asset_constants::ETHEREUM_USDT_TOKEN_ID,
-    nft::{NFTAsset, NFTImages, NFTResource},
+    nft::{NFTAsset, NFTAssetId, NFTImages, NFTResource},
 };
 
 impl NFTAsset {
@@ -10,9 +10,11 @@ impl NFTAsset {
     }
 
     pub fn mock_with_type(token_type: NFTType) -> Self {
+        let id = NFTAssetId::new(Chain::Ethereum, ETHEREUM_USDT_TOKEN_ID, "1");
+        let collection_id = id.get_collection_id();
         NFTAsset {
-            id: "nft_1".to_string(),
-            collection_id: String::new(),
+            id,
+            collection_id,
             contract_address: Some(ETHEREUM_USDT_TOKEN_ID.to_string()),
             token_id: "1".to_string(),
             token_type,
