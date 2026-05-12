@@ -6,7 +6,7 @@ use super::{
 use crate::{
     FetchQuoteData, ProviderData, ProviderType, Quote, QuoteRequest, Route, RpcClient, RpcProvider, Swapper, SwapperChainAsset, SwapperError, SwapperProvider, SwapperQuoteAsset,
     SwapperQuoteData,
-    config::get_swap_api_url,
+    config::get_swap_proxy_url,
     fees::{ReferralFee, default_referral_fees, quote_value_after_reserve_by_chain},
 };
 use async_trait::async_trait;
@@ -38,7 +38,7 @@ impl Stonfi<RpcClient> {
     pub fn new(rpc_provider: Arc<dyn RpcProvider>) -> Self {
         let endpoint = rpc_provider.get_endpoint(Chain::Ton).expect("failed to get TON endpoint for STON.fi");
         let ton_client = TonClient::new(RpcClient::new(endpoint, rpc_provider.clone()));
-        Self::new_with_clients(RpcClient::new(get_swap_api_url("stonfi"), rpc_provider), ton_client)
+        Self::new_with_clients(RpcClient::new(get_swap_proxy_url("stonfi"), rpc_provider), ton_client)
     }
 }
 

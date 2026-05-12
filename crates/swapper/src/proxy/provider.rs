@@ -10,7 +10,7 @@ use crate::{
     FetchQuoteData, ProviderData, ProviderType, Quote, QuoteRequest, Route, SwapResult, Swapper, SwapperError, SwapperProvider, SwapperProviderMode, SwapperQuoteData,
     alien::{RpcClient, RpcProvider},
     approval::{check_approval_erc20, get_swap_gas_limit_with_approval},
-    config::get_swap_api_url,
+    config::get_swap_proxy_url,
     cross_chain::VaultAddresses,
     fees::{DEFAULT_AGGREGATOR_FEE_BPS, DEFAULT_SWAP_FEE_BPS},
     models::SwapperChainAsset,
@@ -104,7 +104,7 @@ where
 
 impl ProxyProvider<RpcClient> {
     fn new_with_path(provider: SwapperProvider, path: &str, assets: Vec<SwapperChainAsset>, rpc_provider: Arc<dyn RpcProvider>) -> Self {
-        let base_url = get_swap_api_url(&format!("swapper/{path}"));
+        let base_url = get_swap_proxy_url(&format!("swapper/{path}"));
         let client = ProxyClient::new(RpcClient::new(base_url, rpc_provider.clone()));
         Self::new_with_client(provider, client, assets, rpc_provider)
     }
@@ -250,7 +250,7 @@ where
     async fn get_swap_result(&self, _chain: Chain, transaction_hash: &str) -> Result<SwapResult, SwapperError> {
         match self.provider.id {
             SwapperProvider::Mayan => {
-                let base_url = get_swap_api_url("mayan/explorer");
+                let base_url = get_swap_proxy_url("mayan/explorer");
                 let client = MayanExplorer::new(base_url, self.rpc_provider.clone());
                 let result = client.get_transaction_status(transaction_hash).await?;
                 Ok(map_swap_result(&result))
@@ -271,7 +271,7 @@ where
     async fn get_vault_addresses(&self, _from_timestamp: Option<u64>) -> Result<VaultAddresses, SwapperError> {
         match self.provider.id {
             SwapperProvider::Mayan => {
-                let base_url = get_swap_api_url("mayan/price");
+                let base_url = get_swap_proxy_url("mayan/price");
                 let client = MayanPrice::new(base_url, self.rpc_provider.clone());
                 let api_addresses = client.get_chains().await.map(MayanChain::unique_addresses).unwrap_or_default();
 

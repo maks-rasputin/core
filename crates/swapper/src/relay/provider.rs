@@ -14,7 +14,7 @@ use super::{
 };
 use crate::{
     FetchQuoteData, ProviderData, ProviderType, Quote, QuoteRequest, Route, RpcClient, RpcProvider, SwapResult, Swapper, SwapperChainAsset, SwapperError, SwapperProvider,
-    SwapperQuoteData, approval::check_approval_erc20, config::get_swap_api_url, cross_chain::VaultAddresses, fees::DEFAULT_REFERRER, fees::quote_value_after_reserve_by_chain,
+    SwapperQuoteData, approval::check_approval_erc20, config::get_swap_proxy_url, cross_chain::VaultAddresses, fees::DEFAULT_REFERRER, fees::quote_value_after_reserve_by_chain,
 };
 
 #[derive(Debug)]
@@ -29,7 +29,7 @@ where
 
 impl Relay<RpcClient> {
     pub fn new(rpc_provider: Arc<dyn RpcProvider>) -> Self {
-        let url = get_swap_api_url("relay");
+        let url = get_swap_proxy_url("relay");
         let client = RelayClient::new(RpcClient::new(url, rpc_provider.clone()));
         Self {
             provider: ProviderType::new(SwapperProvider::Relay),

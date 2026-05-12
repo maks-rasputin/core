@@ -2,7 +2,7 @@ use super::{client::PanoraClient, model};
 use crate::{
     FetchQuoteData, ProviderData, ProviderType, Quote, QuoteRequest, Route, RpcClient, RpcProvider, Swapper, SwapperChainAsset, SwapperError, SwapperProvider, SwapperQuoteAsset,
     SwapperQuoteData,
-    config::get_swap_api_url,
+    config::get_swap_proxy_url,
     fees::{ReferralFee, bps_to_percent_string, default_referral_fees, quote_value_after_reserve_by_chain},
 };
 use async_trait::async_trait;
@@ -23,7 +23,7 @@ where
 
 impl Panora<RpcClient> {
     pub fn new(rpc_provider: Arc<dyn RpcProvider>) -> Self {
-        Self::new_with_client(RpcClient::new(get_swap_api_url("panora"), rpc_provider))
+        Self::new_with_client(RpcClient::new(get_swap_proxy_url("panora"), rpc_provider))
     }
 }
 

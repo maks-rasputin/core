@@ -9,7 +9,7 @@ use super::{SQUID_COSMOS_MULTICALL, SUPPORTED_CHAINS, client::SquidClient, model
 use crate::{
     FetchQuoteData, ProviderData, ProviderType, Quote, QuoteRequest, Route, RpcClient, RpcProvider, SwapResult, Swapper, SwapperChainAsset, SwapperError, SwapperProvider,
     SwapperQuoteData,
-    config::{DEFAULT_SWAP_FEE_BPS, get_swap_api_url},
+    config::{DEFAULT_SWAP_FEE_BPS, get_swap_proxy_url},
     cross_chain::VaultAddresses,
     fees::quote_value_after_reserve_by_chain,
 };
@@ -25,7 +25,7 @@ where
 
 impl Squid<RpcClient> {
     pub fn new(rpc_provider: Arc<dyn RpcProvider>) -> Self {
-        let client = SquidClient::new(RpcClient::new(get_swap_api_url("squid"), rpc_provider));
+        let client = SquidClient::new(RpcClient::new(get_swap_proxy_url("squid"), rpc_provider));
         Self {
             provider: ProviderType::new(SwapperProvider::Squid),
             client,

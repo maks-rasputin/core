@@ -1,8 +1,10 @@
 pub mod client;
 pub mod near_intents;
+pub mod okx;
 
 pub use client::SwapClient;
 pub use near_intents::NearIntentsProxyClient;
+pub use okx::OkxApiClient;
 
 use crate::responders::{ApiError, ApiResponse};
 use primitives::FiatAssets;

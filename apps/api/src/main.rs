@@ -51,7 +51,7 @@ use settings::Settings;
 use settings_chain::{ChainProviders, ProviderFactory};
 use storage::Database;
 use streamer::{StreamProducer, StreamProducerConfig};
-use swap::SwapClient;
+use swap::{OkxApiClient, SwapClient};
 use swapper::swapper::GemSwapper;
 use webhooks::WebhooksClient;
 use websocket_prices::PriceObserverConfig;
@@ -96,6 +96,8 @@ fn mount_routes(rocket: Rocket<Build>, admin_enabled: bool) -> Rocket<Build> {
                 chain::transaction::get_transaction,
                 referral::get_rewards_leaderboard,
                 swap::post_near_intents_quote,
+                swap::okx::post_okx_quote,
+                swap::okx::post_okx_quote_data,
             ],
         )
         .mount(
@@ -184,7 +186,8 @@ async fn rocket_api(settings: Settings) -> Result<Rocket<Build>, Box<dyn std::er
     let chain_client = chain::ChainClient::new(ChainProviders::new(ProviderFactory::new_providers(&settings)));
     let portfolio_client = PortfolioClient::new(database.clone(), price_config);
     let endpoints = ProviderFactory::get_chain_endpoints(&settings);
-    let swapper = Arc::new(GemSwapper::new(Arc::new(swapper::NativeProvider::new_with_endpoints(endpoints))));
+    let native_provider = Arc::new(swapper::NativeProvider::new_with_endpoints(endpoints));
+    let swapper = Arc::new(GemSwapper::new(native_provider.clone()));
 
     let retry = streamer::Retry::new(settings.rabbitmq.retry.delay, settings.rabbitmq.retry.timeout);
     let rabbitmq_config = StreamProducerConfig::new(settings.rabbitmq.url.clone(), retry);
@@ -231,6 +234,15 @@ async fn rocket_api(settings: Settings) -> Result<Rocket<Build>, Box<dyn std::er
     let redemption_client = RewardsRedemptionClient::new(database.clone(), stream_producer.clone());
     let notifications_client = NotificationsClient::new(database.clone());
     let near_intents_client = swap::NearIntentsProxyClient::new(cacher_client.clone());
+    let okx_api_client = OkxApiClient::new(
+        swapper::okx::OkxClientConfig {
+            api_key: settings.swap.okx.key.public.clone(),
+            secret_key: settings.swap.okx.key.secret.clone(),
+            passphrase: settings.swap.okx.passphrase.clone(),
+            project: settings.swap.okx.project.clone(),
+        },
+        native_provider.clone(),
+    );
     let jwt_config = devices::auth_config::JwtConfig {
         secret: settings.api.auth.jwt.secret.clone(),
         expiry: settings.api.auth.jwt.expiry,
@@ -264,6 +276,7 @@ async fn rocket_api(settings: Settings) -> Result<Rocket<Build>, Box<dyn std::er
         .manage(Mutex::new(wallets_client))
         .manage(Mutex::new(notifications_client))
         .manage(Mutex::new(near_intents_client))
+        .manage(okx_api_client)
         .manage(Mutex::new(portfolio_client))
         .manage(auth_client)
         .manage(stream_producer);
