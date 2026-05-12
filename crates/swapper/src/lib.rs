@@ -18,6 +18,7 @@ pub mod hyperliquid;
 pub mod jupiter;
 pub mod models;
 pub mod near_intents;
+pub mod panora;
 pub mod permit2_data;
 pub mod proxy;
 pub mod relay;
