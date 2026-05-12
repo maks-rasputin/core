@@ -189,13 +189,13 @@ impl JsonRpcHandler {
         Ok(client.execute(request).await?)
     }
 
-    // TODO: Temporary dynode override for older app versions. Remove after clients send matching preflightCommitment.
-    fn override_solana_send_transaction(call: &JsonRpcCall) -> JsonRpcCall {
+    // TODO: Temporary dynode override for older app versions. Remove after clients send matching commitment.
+    fn override_solana_get_latest_blockhash(call: &JsonRpcCall) -> JsonRpcCall {
         let mut call = call.clone();
         if let serde_json::Value::Array(items) = &mut call.params
-            && let Some(serde_json::Value::Object(config)) = items.get_mut(1)
+            && let Some(serde_json::Value::Object(config)) = items.get_mut(0)
         {
-            config.insert("preflightCommitment".to_string(), "confirmed".into());
+            config.insert("commitment".to_string(), "finalized".into());
         }
         call
     }
@@ -208,8 +208,8 @@ impl JsonRpcHandler {
         client: &reqwest::Client,
         forward_headers: &HeaderMap,
     ) -> Result<(JsonRpcResult, u16, Vec<u8>), Box<dyn std::error::Error + Send + Sync>> {
-        let upstream_call = if request.chain == Chain::Solana && call.method == "sendTransaction" {
-            Self::override_solana_send_transaction(call)
+        let upstream_call = if request.chain == Chain::Solana && call.method == "getLatestBlockhash" {
+            Self::override_solana_get_latest_blockhash(call)
         } else {
             call.clone()
         };
@@ -307,38 +307,34 @@ mod tests {
     }
 
     #[test]
-    fn test_override_solana_send_transaction() {
-        let old_client = JsonRpcCall {
+    fn test_override_solana_get_latest_blockhash() {
+        let confirmed_client = JsonRpcCall {
             jsonrpc: "2.0".into(),
-            method: "sendTransaction".into(),
-            params: json!(["tx", { "encoding": "base64", "skipPreflight": false }]),
+            method: "getLatestBlockhash".into(),
+            params: json!([{ "commitment": "confirmed" }]),
             id: 1,
         };
-        let result = JsonRpcHandler::override_solana_send_transaction(&old_client);
-        assert_eq!(result.params[0], "tx");
-        assert_eq!(result.params[1]["encoding"], "base64");
-        assert_eq!(result.params[1]["skipPreflight"], false);
-        assert_eq!(result.params[1]["preflightCommitment"], "confirmed");
+        let result = JsonRpcHandler::override_solana_get_latest_blockhash(&confirmed_client);
+        assert_eq!(result.params[0]["commitment"], "finalized");
 
-        let new_client = JsonRpcCall {
+        let processed_client = JsonRpcCall {
             jsonrpc: "2.0".into(),
-            method: "sendTransaction".into(),
-            params: json!(["tx", { "encoding": "base64", "skipPreflight": false, "preflightCommitment": "finalized" }]),
+            method: "getLatestBlockhash".into(),
+            params: json!([{ "commitment": "processed", "minContextSlot": 100 }]),
             id: 1,
         };
-        let result = JsonRpcHandler::override_solana_send_transaction(&new_client);
-        assert_eq!(result.params[1]["encoding"], "base64");
-        assert_eq!(result.params[1]["skipPreflight"], false);
-        assert_eq!(result.params[1]["preflightCommitment"], "confirmed");
+        let result = JsonRpcHandler::override_solana_get_latest_blockhash(&processed_client);
+        assert_eq!(result.params[0]["commitment"], "finalized");
+        assert_eq!(result.params[0]["minContextSlot"], 100);
 
-        let no_config = JsonRpcCall {
+        let no_params = JsonRpcCall {
             jsonrpc: "2.0".into(),
-            method: "sendTransaction".into(),
-            params: json!(["tx"]),
+            method: "getLatestBlockhash".into(),
+            params: json!([]),
             id: 1,
         };
-        let result = JsonRpcHandler::override_solana_send_transaction(&no_config);
-        assert_eq!(result.params, json!(["tx"]));
+        let result = JsonRpcHandler::override_solana_get_latest_blockhash(&no_params);
+        assert_eq!(result.params, json!([]));
     }
 
     #[test]
