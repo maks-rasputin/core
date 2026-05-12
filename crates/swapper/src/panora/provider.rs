@@ -1,7 +1,4 @@
-use super::{
-    client::PanoraClient,
-    model::{PanoraQuoteRequest, PanoraQuoteResponse},
-};
+use super::{client::PanoraClient, model};
 use crate::{
     FetchQuoteData, ProviderData, ProviderType, Quote, QuoteRequest, Route, RpcClient, RpcProvider, Swapper, SwapperChainAsset, SwapperError, SwapperMode, SwapperProvider,
     SwapperQuoteAsset, SwapperQuoteData,
@@ -45,9 +42,9 @@ where
         request.options.fee.clone().map(|fees| fees.aptos).unwrap_or_else(|| default_referral_fees().aptos)
     }
 
-    fn build_request(request: &QuoteRequest, from_value: &str) -> Result<PanoraQuoteRequest, SwapperError> {
+    fn build_request(request: &QuoteRequest, from_value: &str) -> Result<model::QuoteRequest, SwapperError> {
         let referral = Self::referral_fee(request);
-        Ok(PanoraQuoteRequest {
+        Ok(model::QuoteRequest {
             from_token_address: token_address(&request.from_asset),
             to_token_address: token_address(&request.to_asset),
             from_token_amount: BigNumberFormatter::value(from_value, request.from_asset.decimals as i32)?,
@@ -100,13 +97,13 @@ where
 
     async fn get_quote_data(&self, quote: &Quote, _data: FetchQuoteData) -> Result<SwapperQuoteData, SwapperError> {
         let route = quote.data.routes.first().ok_or(SwapperError::InvalidRoute)?;
-        let response: PanoraQuoteResponse = serde_json::from_str(&route.route_data).map_err(|_| SwapperError::InvalidRoute)?;
-        let tx = response.quotes.first().ok_or(SwapperError::InvalidRoute)?.transaction_data.clone();
+        let response: model::QuoteResponse = serde_json::from_str(&route.route_data).map_err(|_| SwapperError::InvalidRoute)?;
+        let transaction = response.quotes.first().ok_or(SwapperError::InvalidRoute)?.transaction_data.clone();
 
         let payload = TransactionPayload {
-            function: Some(tx.function),
-            type_arguments: tx.type_arguments,
-            arguments: tx.arguments,
+            function: Some(transaction.function),
+            type_arguments: transaction.type_arguments,
+            arguments: transaction.arguments,
             payload_type: ENTRY_FUNCTION_PAYLOAD_TYPE.to_string(),
         };
 
@@ -170,7 +167,7 @@ mod tests {
 
     #[test]
     fn test_parse_quote_response() {
-        let response: PanoraQuoteResponse = serde_json::from_str(QUOTE_RESPONSE).unwrap();
+        let response: model::QuoteResponse = serde_json::from_str(QUOTE_RESPONSE).unwrap();
         let entry = response.quotes.first().unwrap();
 
         assert_eq!(response.to_token.decimals, 6);

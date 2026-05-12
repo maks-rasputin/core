@@ -3,7 +3,7 @@ use serde_json::Value;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct PanoraQuoteRequest {
+pub struct QuoteRequest {
     pub from_token_address: String,
     pub to_token_address: String,
     pub from_token_amount: String,
@@ -15,20 +15,20 @@ pub struct PanoraQuoteRequest {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub struct PanoraToken {
+pub struct Token {
     pub decimals: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub struct PanoraQuoteEntry {
+pub struct QuoteEntry {
     pub to_token_amount: String,
     #[serde(rename = "txData")]
-    pub transaction_data: PanoraTransactionData,
+    pub transaction_data: TransactionData,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct PanoraTransactionData {
+pub struct TransactionData {
     pub function: String,
     #[serde(default)]
     pub type_arguments: Vec<String>,
@@ -38,7 +38,7 @@ pub struct PanoraTransactionData {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub struct PanoraQuoteResponse {
-    pub to_token: PanoraToken,
-    pub quotes: Vec<PanoraQuoteEntry>,
+pub struct QuoteResponse {
+    pub to_token: Token,
+    pub quotes: Vec<QuoteEntry>,
 }
