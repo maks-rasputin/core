@@ -18,13 +18,13 @@ uniffi::custom_type!(AssetId, String, {
 uniffi::custom_type!(NFTAssetId, String, {
     remote,
     lower: |s| s.to_string(),
-    try_lift: |s| NFTAssetId::from_str(&s).map_err(uniffi::deps::anyhow::Error::msg),
+    try_lift: |s| NFTAssetId::from_str(&s).map_err(|_| uniffi::deps::anyhow::Error::msg("Invalid NFTAssetId")),
 });
 
 uniffi::custom_type!(NFTCollectionId, String, {
     remote,
     lower: |s| s.to_string(),
-    try_lift: |s| NFTCollectionId::from_str(&s).map_err(uniffi::deps::anyhow::Error::msg),
+    try_lift: |s| NFTCollectionId::from_str(&s).map_err(|_| uniffi::deps::anyhow::Error::msg("Invalid NFTCollectionId")),
 });
 
 pub type GemBigInt = BigInt;
