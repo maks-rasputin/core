@@ -4,6 +4,12 @@ use crate::{
     nft::{NFTAsset, NFTAssetId, NFTImages, NFTResource},
 };
 
+impl NFTAssetId {
+    pub fn mock() -> Self {
+        NFTAssetId::new(Chain::Ethereum, ETHEREUM_USDT_TOKEN_ID, "1")
+    }
+}
+
 impl NFTAsset {
     pub fn mock() -> Self {
         Self::mock_with_type(NFTType::ERC721)
