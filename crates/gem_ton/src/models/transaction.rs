@@ -99,6 +99,7 @@ impl Trace {
 }
 
 pub const TRACE_ACTION_JETTON_SWAP: &str = "jetton_swap";
+pub const TRACE_ACTION_JETTON_TRANSFER: &str = "jetton_transfer";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TraceAction {
@@ -123,6 +124,15 @@ pub struct SwapTransfer {
     pub amount: String,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct JettonTransferDetails {
+    pub asset: String,
+    pub sender: String,
+    pub receiver: String,
+    pub amount: String,
+    pub comment: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransactionMessage {
     pub hash: String,
@@ -139,6 +149,7 @@ pub struct OutMessage {
     pub source: String,
     pub destination: Option<String>,
     pub value: Option<String>,
+    #[serde(alias = "opcode")]
     pub op_code: Option<String>,
     pub comment: Option<String>,
     pub decoded_body: Option<DecodedBody>,

@@ -1,7 +1,9 @@
 use crate::address::Address;
 use crate::address::hex_to_base64_address;
 use crate::constants::FAILED_OPERATION_OPCODES;
-use crate::models::{BroadcastTransaction, JettonSwapDetails, OutMessage, TRACE_ACTION_JETTON_SWAP, Trace, TraceAction, TransactionMessage};
+use crate::models::{
+    BroadcastTransaction, JettonSwapDetails, JettonTransferDetails, OutMessage, TRACE_ACTION_JETTON_SWAP, TRACE_ACTION_JETTON_TRANSFER, Trace, TraceAction, TransactionMessage,
+};
 use chrono::DateTime;
 use gem_encoding::decode_base64;
 use primitives::{AssetId, Transaction, TransactionState, TransactionSwapMetadata, TransactionType, chain::Chain};
@@ -58,15 +60,17 @@ pub fn map_trace_transactions(traces: Vec<Trace>) -> Vec<Transaction> {
 }
 
 fn map_root_trace_transaction(trace: Trace) -> Option<Transaction> {
-    let state = if trace.is_incomplete || trace.has_actions() {
-        Some(trace.action_state())
-    } else {
-        None
-    };
+    let state = if trace.is_incomplete || trace.has_actions() { Some(trace.action_state()) } else { None };
     let swap = jetton_swap(&trace.actions);
+    let jetton_transfer = jetton_transfer(&trace.actions);
     let mut transactions = trace.transactions;
     let root_hash = trace.transactions_order.into_iter().next()?;
     let root = transactions.remove(&root_hash)?;
+
+    if let Some(details) = jetton_transfer {
+        return map_jetton_transfer_transaction(&root, state, details);
+    }
+
     let mut transaction = map_transaction_message_with_state(root, state)?;
     if let Some((sender, metadata)) = swap
         && let Ok(value) = serde_json::to_value(metadata)
@@ -77,6 +81,41 @@ fn map_root_trace_transaction(trace: Trace) -> Option<Transaction> {
         transaction.metadata = Some(value);
     }
     Some(transaction)
+}
+
+fn jetton_transfer(actions: &[TraceAction]) -> Option<JettonTransferDetails> {
+    let action = actions
+        .iter()
+        .find(|action| action.action_type.as_deref() == Some(TRACE_ACTION_JETTON_TRANSFER) && action.success == Some(true))?;
+    serde_json::from_value(action.details.clone()?).ok()
+}
+
+fn map_jetton_transfer_transaction(transaction: &TransactionMessage, state: Option<TransactionState>, details: JettonTransferDetails) -> Option<Transaction> {
+    let fee_asset_id = Chain::Ton.as_asset_id();
+    let state = state.unwrap_or_else(|| map_transaction_state(transaction));
+    let created_at = DateTime::from_timestamp(transaction.now, 0)?;
+    let hash = base64_hash_to_hex(&transaction.hash)?;
+    let token_id = hex_to_base64_address(&details.asset)?;
+    let asset_id = AssetId::from_token(Chain::Ton, &token_id);
+    let from = parse_address(&details.sender)?;
+    let to = parse_address(&details.receiver)?;
+    let memo = details.comment.filter(|comment| !comment.is_empty());
+
+    Some(Transaction::new(
+        hash,
+        asset_id,
+        from,
+        to,
+        None,
+        TransactionType::Transfer,
+        state,
+        transaction.total_fees.to_string(),
+        fee_asset_id,
+        details.amount,
+        memo,
+        None,
+        created_at,
+    ))
 }
 
 fn jetton_swap(actions: &[TraceAction]) -> Option<(String, TransactionSwapMetadata)> {
@@ -319,6 +358,26 @@ mod tests {
         assert!(swap.to_asset.token_id.is_some());
         assert_eq!(swap.to_value, "2436222");
         assert_eq!(swap.provider.as_deref(), Some("stonfi_v2"));
+    }
+
+    #[test]
+    fn test_map_trace_transactions_jetton_transfer() {
+        let traces = TraceResponse::mock_jetton_transfer();
+        let transactions = map_trace_transactions(traces.traces);
+
+        assert_eq!(transactions.len(), 1);
+        let transaction = &transactions[0];
+
+        assert_eq!(transaction.transaction_type, TransactionType::Transfer);
+        assert_eq!(transaction.state, TransactionState::Confirmed);
+        assert_eq!(transaction.from, "UQAzoUpalAaXnVm5MoiYWRZguLFzY0KxFjLv3MkRq5BXz3VV");
+        assert_eq!(transaction.to, "UQDSkZZueXRl0lUk4hagLa8KrJzZbmtTE_RPZwTDSIw32WNH");
+        assert_eq!(transaction.value, "120000");
+        assert_eq!(transaction.asset_id.chain, Chain::Ton);
+        assert_eq!(transaction.asset_id.token_id.as_deref(), Some("EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"));
+        assert_eq!(transaction.fee, "472458");
+        assert_eq!(transaction.fee_asset_id, AssetId::from_chain(Chain::Ton));
+        assert_eq!(transaction.memo, None);
     }
 
     #[test]
