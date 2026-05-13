@@ -2,8 +2,8 @@ use std::collections::HashSet;
 use std::{collections::HashMap, error::Error};
 
 use async_trait::async_trait;
-use primitives::{AssetAddress, DeviceSubscription, Transaction, TransactionId, TransactionState, TransactionType};
-use storage::{AssetsAddressesRepository, AssetsRepository, Database, TransactionsRepository, WalletsRepository};
+use primitives::{AssetAddress, DeviceSubscription, NFTAssetId, Transaction, TransactionId, TransactionState, TransactionType};
+use storage::{AssetsAddressesRepository, AssetsRepository, Database, NftAssetFilter, NftRepository, TransactionsRepository, WalletsRepository};
 use streamer::{AssetId, NotificationsPayload, StreamProducer, StreamProducerQueue, TransactionsPayload, WalletStreamEvent, WalletStreamPayload, consumer::MessageConsumer};
 use swapper::cross_chain::{self, DepositAddressMap, SendAddressMap};
 
@@ -63,6 +63,17 @@ impl MessageConsumer<TransactionsPayload, usize> for StoreTransactionsConsumer {
         let existing_assets_map: HashMap<AssetId, primitives::AssetPriceMetadata> = existing_assets.into_iter().map(|asset| (asset.asset.asset.id.clone(), asset)).collect();
 
         let _ = self.stream_producer.publish_fetch_assets(missing_assets).await;
+
+        let nft_asset_ids: Vec<NFTAssetId> = transactions
+            .iter()
+            .filter(|x| x.addresses().iter().any(|addr| subscription_addresses.contains(addr)))
+            .filter_map(|x| x.nft_asset_id())
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect();
+
+        let missing_nft_assets = self.get_missing_nft_assets(nft_asset_ids).await?;
+        let _ = self.stream_producer.publish_fetch_nft_assets(missing_nft_assets).await;
 
         let mut transactions_map: HashMap<TransactionId, Transaction> = HashMap::new();
         let mut assets_addresses = HashSet::new();
@@ -223,6 +234,16 @@ impl StoreTransactionsConsumer {
             .collect::<Vec<_>>();
 
         Ok((assets_with_prices, missing_assets_ids))
+    }
+
+    async fn get_missing_nft_assets(&self, nft_asset_ids: Vec<NFTAssetId>) -> Result<Vec<NFTAssetId>, Box<dyn Error + Send + Sync>> {
+        if nft_asset_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let identifiers: Vec<String> = nft_asset_ids.iter().map(|id| id.to_string()).collect();
+        let existing = self.database.nft()?.get_nft_assets_by_filter(vec![NftAssetFilter::Identifiers(identifiers)])?;
+        let existing_ids: HashSet<NFTAssetId> = existing.into_iter().map(|row| row.identifier.0).collect();
+        Ok(nft_asset_ids.into_iter().filter(|id| !existing_ids.contains(id)).collect())
     }
 
     async fn store_transactions(&self, transactions: Vec<Transaction>) -> Result<usize, Box<dyn Error + Send + Sync>> {

@@ -59,79 +59,103 @@ pub fn map_trace_transactions(traces: Vec<Trace>) -> Vec<Transaction> {
     traces.into_iter().filter_map(map_root_trace_transaction).collect()
 }
 
+struct TransferDetails {
+    asset_id: AssetId,
+    from: String,
+    to: String,
+    value: String,
+    transaction_type: TransactionType,
+    memo: Option<String>,
+    metadata: Option<serde_json::Value>,
+}
+
 fn map_root_trace_transaction(trace: Trace) -> Option<Transaction> {
     let state = if trace.is_incomplete || trace.has_actions() { Some(trace.action_state()) } else { None };
-    let swap = jetton_swap(&trace.actions);
-    let jetton_transfer = jetton_transfer(&trace.actions);
     let mut transactions = trace.transactions;
     let root_hash = trace.transactions_order.into_iter().next()?;
     let root = transactions.remove(&root_hash)?;
 
-    if let Some(details) = jetton_transfer {
-        return map_jetton_transfer_transaction(&root, state, details);
-    }
+    let details = if let Some(d) = jetton_transfer_details(&trace.actions) {
+        d
+    } else {
+        let mut d = simple_transfer_details(&root)?;
+        apply_jetton_swap(&mut d, &trace.actions);
+        d
+    };
 
-    let mut transaction = map_transaction_message_with_state(root, state)?;
-    if let Some((sender, metadata)) = swap
-        && let Ok(value) = serde_json::to_value(metadata)
-    {
-        transaction.transaction_type = TransactionType::Swap;
-        transaction.from = sender.clone();
-        transaction.to = sender;
-        transaction.metadata = Some(value);
-    }
-    Some(transaction)
+    build_transaction(&root, state, details)
 }
 
-fn jetton_transfer(actions: &[TraceAction]) -> Option<JettonTransferDetails> {
-    let action = actions
-        .iter()
-        .find(|action| action.action_type.as_deref() == Some(TRACE_ACTION_JETTON_TRANSFER) && action.success == Some(true))?;
-    serde_json::from_value(action.details.clone()?).ok()
-}
-
-fn map_jetton_transfer_transaction(transaction: &TransactionMessage, state: Option<TransactionState>, details: JettonTransferDetails) -> Option<Transaction> {
+fn build_transaction(message: &TransactionMessage, state: Option<TransactionState>, details: TransferDetails) -> Option<Transaction> {
     let fee_asset_id = Chain::Ton.as_asset_id();
-    let state = state.unwrap_or_else(|| map_transaction_state(transaction));
-    let created_at = DateTime::from_timestamp(transaction.now, 0)?;
-    let hash = base64_hash_to_hex(&transaction.hash)?;
-    let token_id = hex_to_base64_address(&details.asset)?;
-    let asset_id = AssetId::from_token(Chain::Ton, &token_id);
-    let from = parse_address(&details.sender)?;
-    let to = parse_address(&details.receiver)?;
-    let memo = details.comment.filter(|comment| !comment.is_empty());
+    let state = state.unwrap_or_else(|| map_transaction_state(message));
+    let created_at = DateTime::from_timestamp(message.now, 0)?;
+    let hash = base64_hash_to_hex(&message.hash)?;
 
     Some(Transaction::new(
         hash,
-        asset_id,
-        from,
-        to,
+        details.asset_id,
+        details.from,
+        details.to,
         None,
-        TransactionType::Transfer,
+        details.transaction_type,
         state,
-        transaction.total_fees.to_string(),
+        message.total_fees.to_string(),
         fee_asset_id,
-        details.amount,
-        memo,
-        None,
+        details.value,
+        details.memo,
+        details.metadata,
         created_at,
     ))
 }
 
-fn jetton_swap(actions: &[TraceAction]) -> Option<(String, TransactionSwapMetadata)> {
-    let action = actions
+fn find_action<'a>(actions: &'a [TraceAction], action_type: &str) -> Option<&'a TraceAction> {
+    actions
         .iter()
-        .find(|action| action.action_type.as_deref() == Some(TRACE_ACTION_JETTON_SWAP) && action.success == Some(true))?;
-    let details: JettonSwapDetails = serde_json::from_value(action.details.clone()?).ok()?;
-    let sender = parse_address(&details.sender)?;
-    let metadata = TransactionSwapMetadata {
-        from_asset: ton_asset_id(details.asset_in.as_deref())?,
-        from_value: details.dex_incoming_transfer.amount,
-        to_asset: ton_asset_id(details.asset_out.as_deref())?,
-        to_value: details.dex_outgoing_transfer.amount,
-        provider: details.dex,
+        .find(|action| action.action_type.as_deref() == Some(action_type) && action.success == Some(true))
+}
+
+fn jetton_transfer_details(actions: &[TraceAction]) -> Option<TransferDetails> {
+    let details: JettonTransferDetails = serde_json::from_value(find_action(actions, TRACE_ACTION_JETTON_TRANSFER)?.details.clone()?).ok()?;
+    let token_id = hex_to_base64_address(&details.asset)?;
+    Some(TransferDetails {
+        asset_id: AssetId::from_token(Chain::Ton, &token_id),
+        from: parse_address(&details.sender)?,
+        to: parse_address(&details.receiver)?,
+        value: details.amount,
+        transaction_type: TransactionType::Transfer,
+        memo: details.comment.filter(|comment| !comment.is_empty()),
+        metadata: None,
+    })
+}
+
+fn apply_jetton_swap(details: &mut TransferDetails, actions: &[TraceAction]) {
+    let Some(action) = find_action(actions, TRACE_ACTION_JETTON_SWAP) else {
+        return;
     };
-    Some((sender, metadata))
+    let Some(swap): Option<JettonSwapDetails> = action.details.clone().and_then(|value| serde_json::from_value(value).ok()) else {
+        return;
+    };
+    let Some(sender) = parse_address(&swap.sender) else {
+        return;
+    };
+    let (Some(from_asset), Some(to_asset)) = (ton_asset_id(swap.asset_in.as_deref()), ton_asset_id(swap.asset_out.as_deref())) else {
+        return;
+    };
+    let metadata = TransactionSwapMetadata {
+        from_asset,
+        from_value: swap.dex_incoming_transfer.amount,
+        to_asset,
+        to_value: swap.dex_outgoing_transfer.amount,
+        provider: swap.dex,
+    };
+    let Ok(metadata) = serde_json::to_value(metadata) else {
+        return;
+    };
+    details.transaction_type = TransactionType::Swap;
+    details.from = sender.clone();
+    details.to = sender;
+    details.metadata = Some(metadata);
 }
 
 fn ton_asset_id(raw_address: Option<&str>) -> Option<AssetId> {
@@ -141,63 +165,38 @@ fn ton_asset_id(raw_address: Option<&str>) -> Option<AssetId> {
     }
 }
 
-fn map_transaction_message_with_state(transaction: TransactionMessage, state: Option<TransactionState>) -> Option<Transaction> {
+fn simple_transfer_details(message: &TransactionMessage) -> Option<TransferDetails> {
     let asset_id = Chain::Ton.as_asset_id();
-    let state = state.unwrap_or_else(|| map_transaction_state(&transaction));
-    let created_at = DateTime::from_timestamp(transaction.now, 0)?;
-    let hash = base64_hash_to_hex(&transaction.hash)?;
 
-    if transaction.out_msgs.len() == 1 && is_simple_transfer(transaction.out_msgs.first()?) {
-        let out_message = transaction.out_msgs.first()?;
-        let from = parse_address(&out_message.source)?;
-        let to = match &out_message.destination {
-            Some(destination) => parse_address(destination)?,
-            None => return None,
-        };
-        let value = out_message.value.as_ref().unwrap_or(&"0".to_string()).clone();
-        let memo = extract_memo(out_message);
-
-        return Some(Transaction::new(
-            hash,
-            asset_id.clone(),
-            from,
-            to,
-            None,
-            TransactionType::Transfer,
-            state,
-            transaction.total_fees.to_string(),
+    if message.out_msgs.len() == 1 && is_simple_transfer(message.out_msgs.first()?) {
+        let out_message = message.out_msgs.first()?;
+        let to = parse_address(out_message.destination.as_deref()?)?;
+        return Some(TransferDetails {
             asset_id,
-            value,
-            memo,
-            None,
-            created_at,
-        ));
+            from: parse_address(&out_message.source)?,
+            to,
+            value: out_message.value.clone().unwrap_or_else(|| "0".to_string()),
+            transaction_type: TransactionType::Transfer,
+            memo: extract_memo(out_message),
+            metadata: None,
+        });
     }
 
-    if transaction.out_msgs.is_empty()
-        && let Some(in_msg) = &transaction.in_msg
+    if message.out_msgs.is_empty()
+        && let Some(in_msg) = &message.in_msg
         && let (Some(value), Some(source)) = (&in_msg.value, &in_msg.source)
         && let Ok(value_int) = value.parse::<i64>()
         && value_int > 0
     {
-        let from = parse_address(source)?;
-        let to = parse_address(&in_msg.destination)?;
-
-        return Some(Transaction::new(
-            hash,
-            asset_id.clone(),
-            from,
-            to,
-            None,
-            TransactionType::Transfer,
-            state,
-            transaction.total_fees.to_string(),
+        return Some(TransferDetails {
             asset_id,
-            value.clone(),
-            None,
-            None,
-            created_at,
-        ));
+            from: parse_address(source)?,
+            to: parse_address(&in_msg.destination)?,
+            value: value.clone(),
+            transaction_type: TransactionType::Transfer,
+            memo: None,
+            metadata: None,
+        });
     }
 
     None
