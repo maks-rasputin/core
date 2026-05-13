@@ -1,6 +1,6 @@
 use super::{
     constants::{FUNCTION_TRANSFER_OR_DESTROY_COIN, MODULE_ROUTER},
-    error::{sui_error, tx_error},
+    error::error,
     swap::build_swap,
 };
 use crate::{Quote, SwapperError, cetus::model::RouterData, fees::ReferralFee};
@@ -38,7 +38,7 @@ pub(super) fn build_transaction(
     input: &BuildInput<'_>,
 ) -> Result<TxOutput, SwapperError> {
     let mut txb = TransactionBuilder::new();
-    let input_coin = build_input_coin(&mut txb, input.from_coin_type, input.amount, input.from_coins).map_err(sui_error)?;
+    let input_coin = build_input_coin(&mut txb, input.from_coin_type, input.amount, input.from_coins).map_err(error)?;
     let target_coin = build_swap(&mut txb, resolver, quote, router, referral_fee, input_coin)?;
 
     if is_sui_coin(input.target_coin_type) {
@@ -56,8 +56,8 @@ pub(super) fn build_transaction(
             &[input.target_coin_type],
             vec![target_coin],
         )
-        .map_err(tx_error)?;
+        .map_err(error)?;
     }
 
-    finish_transaction(txb, input.transaction.clone()).map_err(sui_error)
+    finish_transaction(txb, input.transaction.clone()).map_err(error)
 }

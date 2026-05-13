@@ -40,8 +40,8 @@ impl<C: Client + Clone> ChainStaking for SolanaClient<C> {
 #[cfg(all(test, feature = "chain_integration_tests"))]
 mod chain_integration_tests {
     use super::*;
+    use crate::provider::testkit::create_solana_test_client;
     use primitives::testkit::signer_mock::TEST_SOLANA_SENDER;
-    use crate::provider::testkit::{ create_solana_test_client};
 
     #[tokio::test]
     async fn test_solana_get_staking_apy() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {

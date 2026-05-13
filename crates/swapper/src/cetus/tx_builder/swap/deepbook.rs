@@ -1,8 +1,8 @@
-use super::{finalize_swap, prepare_swap_inputs};
 use super::super::{
     constants::{FUNCTION_ADD_DEEP_PRICE_POINT, MODULE_DEEPBOOK_V3},
-    error::tx_error,
+    error::error,
 };
+use super::{finalize_swap, prepare_swap_inputs};
 use crate::{
     SwapperError,
     cetus::{
@@ -27,7 +27,7 @@ pub(super) fn build_swap(txb: &mut TransactionBuilder, resolver: &ObjectResolver
     }
 
     let s = prepare_swap_inputs(txb, resolver, flattened_path, DEEPBOOK_V3_GLOBAL_CONFIG)?;
-    let deep_coin = zero_coin(txb, DEEPBOOK_V3_DEEP_FEE_TYPE).map_err(tx_error)?;
+    let deep_coin = zero_coin(txb, DEEPBOOK_V3_DEEP_FEE_TYPE).map_err(error)?;
     // deepbook uses (amount_in, direction) order, with deep_coin appended before clock.
     finalize_swap(
         txb,
@@ -47,8 +47,8 @@ fn add_deep_price_point(txb: &mut TransactionBuilder, resolver: &ObjectResolver,
     } else {
         (path.target.as_str(), path.from.as_str())
     };
-    let pool = resolver.shared_object(txb, &path.id, true).map_err(tx_error)?;
-    let reference_pool = resolver.shared_object(txb, reference_pool_id, true).map_err(tx_error)?;
+    let pool = resolver.shared_object(txb, &path.id, true).map_err(error)?;
+    let reference_pool = resolver.shared_object(txb, reference_pool_id, true).map_err(error)?;
     let clock = txb.object(sui_clock_object_input());
 
     move_call(
@@ -59,6 +59,6 @@ fn add_deep_price_point(txb: &mut TransactionBuilder, resolver: &ObjectResolver,
         &[coin_a, coin_b, reference_pool_base_type, reference_pool_quote_type],
         vec![pool, reference_pool, clock],
     )
-    .map_err(tx_error)?;
+    .map_err(error)?;
     Ok(())
 }

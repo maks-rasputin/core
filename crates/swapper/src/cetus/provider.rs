@@ -6,15 +6,15 @@ use crate::{
     fees::{ReferralFee, apply_slippage_in_bp, default_referral_fees, quote_value_after_reserve_by_chain},
 };
 use async_trait::async_trait;
-use gem_client::DebugClientBounds;
+use gem_client::Client;
 use gem_sui::{SUI_COIN_TYPE, SuiClient, full_coin_type};
 use primitives::Chain;
 use std::{fmt::Debug, sync::Arc};
 
 pub struct Cetus<C, R>
 where
-    C: DebugClientBounds,
-    R: DebugClientBounds,
+    C: Client + Clone + Send + Sync + Debug + 'static,
+    R: Client + Clone + Send + Sync + Debug + 'static,
 {
     provider: ProviderType,
     cetus_client: CetusClient<C>,
@@ -23,8 +23,8 @@ where
 
 impl<C, R> Debug for Cetus<C, R>
 where
-    C: DebugClientBounds,
-    R: DebugClientBounds,
+    C: Client + Clone + Send + Sync + Debug + 'static,
+    R: Client + Clone + Send + Sync + Debug + 'static,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Cetus").field("provider", &self.provider).finish()
@@ -41,8 +41,8 @@ impl Cetus<RpcClient, RpcClient> {
 
 impl<C, R> Cetus<C, R>
 where
-    C: DebugClientBounds,
-    R: DebugClientBounds,
+    C: Client + Clone + Send + Sync + Debug + 'static,
+    R: Client + Clone + Send + Sync + Debug + 'static,
 {
     pub fn with_clients(cetus_client: CetusClient<C>, sui_client: SuiClient<R>) -> Self {
         Self {
@@ -53,15 +53,15 @@ where
     }
 
     fn referral_fee(request: &QuoteRequest) -> ReferralFee {
-        request.options.fee.clone().map(|fees| fees.sui).unwrap_or_else(|| default_referral_fees().sui)
+        request.options.fee.as_ref().map(|fees| fees.sui.clone()).unwrap_or_else(|| default_referral_fees().sui)
     }
 }
 
 #[async_trait]
 impl<C, R> Swapper for Cetus<C, R>
 where
-    C: DebugClientBounds,
-    R: DebugClientBounds,
+    C: Client + Clone + Send + Sync + Debug + 'static,
+    R: Client + Clone + Send + Sync + Debug + 'static,
 {
     fn provider(&self) -> &ProviderType {
         &self.provider

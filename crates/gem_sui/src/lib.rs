@@ -31,7 +31,6 @@ pub use models::ObjectId;
 use std::error::Error;
 use sui_transaction_builder::ObjectInput;
 pub use tx_builder::{decode_transaction, stake::*, transfer::*, validate_and_hash};
-pub use tx_builder::{stake, transfer};
 
 pub const SUI_SYSTEM_ID: &str = "sui_system";
 

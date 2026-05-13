@@ -78,9 +78,9 @@ impl<C: Client + Clone> ChainTransactionLoad for SolanaClient<C> {
 #[cfg(all(test, feature = "chain_integration_tests"))]
 mod chain_integration_tests {
     use super::*;
-    use primitives::testkit::signer_mock::TEST_SOLANA_SENDER;
-    use crate::provider::testkit::{ TEST_EMPTY_ADDRESS, create_solana_test_client};
+    use crate::provider::testkit::{TEST_EMPTY_ADDRESS, create_solana_test_client};
     use primitives::swap::SwapData;
+    use primitives::testkit::signer_mock::TEST_SOLANA_SENDER;
     use primitives::{Asset, SwapProvider};
 
     #[tokio::test]

@@ -317,12 +317,7 @@ mod tests {
 #[cfg(all(test, feature = "swap_integration_tests"))]
 mod swap_integration_tests {
     use super::*;
-    use crate::{
-        Options, SwapperQuoteAsset,
-        alien::reqwest_provider::NativeProvider,
-        stonfi::testkit::NOT_TOKEN_ID,
-        testkit::mock_ton,
-    };
+    use crate::{Options, SwapperQuoteAsset, alien::reqwest_provider::NativeProvider, stonfi::testkit::NOT_TOKEN_ID, testkit::mock_ton};
     use primitives::{AssetId, asset_constants::TON_USDT_ASSET_ID, testkit::signer_mock::TEST_TON_SENDER};
 
     #[tokio::test]

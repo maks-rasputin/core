@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use super::constants::{AGGREGATOR_V3_PACKAGE, DEFAULT_AGGREGATOR_V3};
 
@@ -94,10 +94,9 @@ impl TryFrom<&RouterData> for ProcessedRouterData {
             })
             .collect();
 
-        let mut seen_tokens = BTreeMap::new();
+        let mut seen_tokens: BTreeSet<String> = BTreeSet::new();
         for flattened_path in flattened_paths.iter_mut().rev() {
-            if !seen_tokens.contains_key(&flattened_path.path.from) {
-                seen_tokens.insert(flattened_path.path.from.clone(), true);
+            if seen_tokens.insert(flattened_path.path.from.clone()) {
                 flattened_path.is_last_use_of_intermediate_token = true;
             }
         }

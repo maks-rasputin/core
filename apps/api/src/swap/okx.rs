@@ -1,10 +1,6 @@
 use primitives::swap::{ProxyQuote, ProxyQuoteRequest, SwapQuoteData};
 use rocket::serde::json::Json;
-use swapper::{
-    RpcClient,
-    okx::OkxProvider,
-    proxy::ProxyResponse,
-};
+use swapper::{RpcClient, okx::OkxProvider, proxy::ProxyResponse};
 
 #[rocket::post("/swaps/providers/okx/quote", data = "<body>")]
 pub async fn post_okx_quote(body: Json<ProxyQuoteRequest>, provider: &rocket::State<OkxProvider<RpcClient>>) -> Json<ProxyResponse<ProxyQuote>> {

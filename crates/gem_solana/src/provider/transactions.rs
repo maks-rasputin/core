@@ -52,9 +52,9 @@ impl<C: Client + Clone> ChainTransactions for SolanaClient<C> {
 #[cfg(all(test, feature = "chain_integration_tests"))]
 mod chain_integration_tests {
     use super::*;
-    use primitives::testkit::signer_mock::TEST_SOLANA_SENDER;
-    use crate::provider::testkit::{ TEST_TRANSACTION_ID, create_solana_test_client};
+    use crate::provider::testkit::{TEST_TRANSACTION_ID, create_solana_test_client};
     use chain_traits::ChainState;
+    use primitives::testkit::signer_mock::TEST_SOLANA_SENDER;
 
     #[tokio::test]
     async fn test_solana_get_transactions_by_block() {

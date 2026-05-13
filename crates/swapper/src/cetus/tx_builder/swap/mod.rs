@@ -4,15 +4,15 @@ mod deepbook;
 
 use super::{
     constants::{FUNCTION_CONFIRM_SWAP, FUNCTION_NEW_SWAP_CONTEXT, FUNCTION_SWAP, MODULE_ROUTER},
-    error::tx_error,
+    error::error,
     model::{SwapLimits, SwapStep},
 };
 use crate::{
     Quote, SwapperError,
     cetus::{
         constants::{
-            BLUEFIN, BLUEFIN_GLOBAL_CONFIG, CETUS, CETUS_DLMM, CETUS_DLMM_GLOBAL_CONFIG, CETUS_DLMM_PARTNER, CETUS_DLMM_VERSIONED, CETUS_GLOBAL_CONFIG, CETUS_PARTNER,
-            DEEPBOOK_V3, DEEPBOOK_V3_GLOBAL_CONFIG,
+            BLUEFIN, BLUEFIN_GLOBAL_CONFIG, CETUS, CETUS_DLMM, CETUS_DLMM_GLOBAL_CONFIG, CETUS_DLMM_PARTNER, CETUS_DLMM_VERSIONED, CETUS_GLOBAL_CONFIG, CETUS_PARTNER, DEEPBOOK_V3,
+            DEEPBOOK_V3_GLOBAL_CONFIG,
         },
         model::{FlattenedPath, ProcessedRouterData, RouterData},
     },
@@ -41,8 +41,8 @@ pub(super) fn prepare_swap_inputs<'a>(
     global_config_id: &str,
 ) -> Result<SwapInputs<'a>, SwapperError> {
     let step = SwapStep::try_from(flattened_path)?;
-    let global_config = resolver.shared_object(txb, global_config_id, true).map_err(tx_error)?;
-    let pool = resolver.shared_object(txb, &step.path.id, true).map_err(tx_error)?;
+    let global_config = resolver.shared_object(txb, global_config_id, true).map_err(error)?;
+    let pool = resolver.shared_object(txb, &step.path.id, true).map_err(error)?;
     let direction = txb.pure(&step.path.direction);
     let amount_in = txb.pure(&step.amount_in);
     let clock = txb.object(sui_clock_object_input());
@@ -57,7 +57,7 @@ pub(super) fn prepare_swap_inputs<'a>(
 }
 
 pub(super) fn finalize_swap(txb: &mut TransactionBuilder, step: &SwapStep<'_>, module: &str, args: Vec<Argument>) -> Result<(), SwapperError> {
-    move_call(txb, step.published_at, module, FUNCTION_SWAP, &[step.coin_a, step.coin_b], args).map_err(tx_error)?;
+    move_call(txb, step.published_at, module, FUNCTION_SWAP, &[step.coin_a, step.coin_b], args).map_err(error)?;
     Ok(())
 }
 
@@ -126,7 +126,7 @@ pub(super) fn build_swap(
         &[&processed.from_coin_type, &processed.target_coin_type],
         vec![request_id, expected_amount_out, amount_out_limit, input_coin, fee_rate, fee_recipient],
     )
-    .map_err(tx_error)?;
+    .map_err(error)?;
 
     for flattened_path in &processed.flattened_paths {
         match flattened_path.path.provider.as_str() {
@@ -146,7 +146,7 @@ pub(super) fn build_swap(
         &[&processed.target_coin_type],
         vec![swap_context],
     )
-    .map_err(tx_error)
+    .map_err(error)
 }
 
 #[cfg(test)]
@@ -176,17 +176,10 @@ mod tests {
         assert_eq!(object_ids, expected);
 
         let fixture_ids: BTreeSet<String> = shared_object_ids(&fixture_router()).unwrap().into_iter().collect();
-        let expected_fixture: BTreeSet<String> = [
-            BLUEFIN_GLOBAL_CONFIG,
-            CETUS_GLOBAL_CONFIG,
-            CETUS_PARTNER,
-            "0xpool1",
-            "0xpool2",
-            "0xpool3",
-        ]
-        .iter()
-        .map(|s| s.to_string())
-        .collect();
+        let expected_fixture: BTreeSet<String> = [BLUEFIN_GLOBAL_CONFIG, CETUS_GLOBAL_CONFIG, CETUS_PARTNER, "0xpool1", "0xpool2", "0xpool3"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
         assert_eq!(fixture_ids, expected_fixture);
 
         let mut deepbook_router = router(1000);

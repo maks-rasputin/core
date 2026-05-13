@@ -3,20 +3,15 @@ use super::{
     model::{RouterData, RouterRequest, RouterResponse},
 };
 use crate::SwapperError;
-use gem_client::{ClientBounds, ClientExt, build_path_with_query};
+use gem_client::{Client, ClientExt, build_path_with_query};
+use std::fmt::Debug;
 
 #[derive(Debug)]
-pub struct CetusClient<C>
-where
-    C: ClientBounds,
-{
+pub struct CetusClient<C: Client + Clone + Debug> {
     client: C,
 }
 
-impl<C> CetusClient<C>
-where
-    C: ClientBounds,
-{
+impl<C: Client + Clone + Debug> CetusClient<C> {
     pub fn new(client: C) -> Self {
         Self { client }
     }

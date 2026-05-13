@@ -109,7 +109,14 @@ where
         Ok(SwapQuoteData::new_contract(tx.to.clone(), value, tx.data.clone(), approval, gas_limit))
     }
 
-    async fn build_evm_approval(&self, from_asset: &QuoteAsset, signature_data: Option<&[String]>, from_value: &str, chain: Chain, owner: &str) -> Result<Option<ApprovalData>, SwapperError> {
+    async fn build_evm_approval(
+        &self,
+        from_asset: &QuoteAsset,
+        signature_data: Option<&[String]>,
+        from_value: &str,
+        chain: Chain,
+        owner: &str,
+    ) -> Result<Option<ApprovalData>, SwapperError> {
         let Some(token) = from_asset.asset_id().token_id else {
             return Ok(None);
         };
@@ -272,10 +279,7 @@ mod tests {
         let eth = AssetId::from_chain(Chain::Ethereum).to_string();
         assert_eq!(asset_to_token_address(&quote_asset(&sol)).unwrap(), SOLANA_NATIVE_TOKEN_ADDRESS);
         assert_eq!(asset_to_token_address(&quote_asset(&eth)).unwrap(), EVM_NATIVE_TOKEN_ADDRESS);
-        assert_eq!(
-            asset_to_token_address(&quote_asset(&ETHEREUM_USDC_ASSET_ID.to_string())).unwrap(),
-            ETHEREUM_USDC_TOKEN_ID
-        );
+        assert_eq!(asset_to_token_address(&quote_asset(&ETHEREUM_USDC_ASSET_ID.to_string())).unwrap(), ETHEREUM_USDC_TOKEN_ID);
     }
 
     #[test]

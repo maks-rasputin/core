@@ -3,8 +3,8 @@ use std::error::Error;
 use localizer::LanguageLocalizer;
 use number_formatter::{ValueFormatter, ValueStyle};
 use primitives::{
-    AddressFormatStyle, AddressFormatter, Asset, AssetVecExt, Chain, DeviceSubscription, FiatQuoteType, GorushNotification, PushNotification,
-    PushNotificationTransaction, PushNotificationTypes, Transaction, TransactionNFTTransferMetadata, TransactionPerpetualMetadata, TransactionSwapMetadata, TransactionType,
+    AddressFormatStyle, AddressFormatter, Asset, AssetVecExt, Chain, DeviceSubscription, FiatQuoteType, GorushNotification, PushNotification, PushNotificationTransaction,
+    PushNotificationTypes, Transaction, TransactionNFTTransferMetadata, TransactionPerpetualMetadata, TransactionSwapMetadata, TransactionType,
 };
 use storage::{Database, ScanAddressesRepository};
 

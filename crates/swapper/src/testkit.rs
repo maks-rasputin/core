@@ -7,7 +7,6 @@ use primitives::{AssetId, Chain, asset_constants::TON_USDT_TOKEN_ID};
 
 use super::{Options, Quote, QuoteRequest};
 
-
 impl ProviderData {
     pub fn mock() -> Self {
         ProviderData {

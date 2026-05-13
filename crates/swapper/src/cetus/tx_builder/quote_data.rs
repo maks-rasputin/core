@@ -1,5 +1,5 @@
 use super::{
-    error::sui_error,
+    error::error,
     swap::shared_object_ids,
     transaction::{BuildInput, build_transaction},
 };
@@ -8,10 +8,16 @@ use crate::{
     cetus::{constants::PINNED_VERSIONS, model::RouterData},
     fees::ReferralFee,
 };
-use gem_client::ClientBounds;
+use gem_client::Client;
 use gem_sui::{ESTIMATION_GAS_BUDGET, SuiClient, gas_budget::GAS_BUDGET_MULTIPLIER, tx_builder::PrefetchedTransactionData};
+use std::fmt::Debug;
 
-pub async fn build_quote_data<C: ClientBounds>(client: &SuiClient<C>, quote: &Quote, router: &RouterData, referral_fee: &ReferralFee) -> Result<SwapperQuoteData, SwapperError> {
+pub async fn build_quote_data<C: Client + Clone + Send + Sync + Debug + 'static>(
+    client: &SuiClient<C>,
+    quote: &Quote,
+    router: &RouterData,
+    referral_fee: &ReferralFee,
+) -> Result<SwapperQuoteData, SwapperError> {
     let sender = quote.request.wallet_address.as_str();
     let from_coin_type = router.paths.first().ok_or(SwapperError::InvalidRoute)?.from.clone();
     let target_coin_type = router.paths.last().ok_or(SwapperError::InvalidRoute)?.target.clone();
@@ -26,7 +32,7 @@ pub async fn build_quote_data<C: ClientBounds>(client: &SuiClient<C>, quote: &Qu
         ESTIMATION_GAS_BUDGET,
     )
     .await
-    .map_err(sui_error)?;
+    .map_err(error)?;
 
     let input = BuildInput {
         transaction: prefetched.transaction.clone(),

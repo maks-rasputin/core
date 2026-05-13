@@ -21,39 +21,29 @@ impl PrefetchedTransactionData {
         pinned: &HashMap<String, u64>,
         gas_budget: u64,
     ) -> Result<Self, SuiError> {
-        let (transaction, input_coins, output_coin, resolver) = try_join!(
+        let (transaction, input_coins, output_coins, resolver) = try_join!(
             TransactionBuilderInput::prefetch(client, sender, gas_budget),
-            fetch_input_coins(client, sender, input_coin_type),
-            fetch_output_coin(client, sender, output_coin_type),
+            get_user_coins(client, sender, input_coin_type),
+            get_user_coins(client, sender, output_coin_type),
             ObjectResolver::prefetch(client, object_ids, pinned),
         )?;
 
         Ok(Self {
             transaction,
             input_coins,
-            output_coin,
+            output_coin: output_coins.into_iter().next(),
             resolver,
         })
     }
 }
 
-async fn fetch_input_coins<C: Client + Clone>(client: &SuiClient<C>, owner: &str, coin_type: &str) -> Result<Vec<CoinAsset>, SuiError> {
+async fn get_user_coins<C: Client + Clone>(client: &SuiClient<C>, owner: &str, coin_type: &str) -> Result<Vec<CoinAsset>, SuiError> {
     if is_sui_coin(coin_type) {
         Ok(Vec::new())
     } else {
-        client.get_coin_assets_by_type(owner, coin_type).await.map_err(|err| SuiError::invalid_input(err.to_string()))
-    }
-}
-
-async fn fetch_output_coin<C: Client + Clone>(client: &SuiClient<C>, owner: &str, coin_type: &str) -> Result<Option<CoinAsset>, SuiError> {
-    if is_sui_coin(coin_type) {
-        Ok(None)
-    } else {
-        Ok(client
+        client
             .get_coin_assets_by_type(owner, coin_type)
             .await
-            .map_err(|err| SuiError::invalid_input(err.to_string()))?
-            .into_iter()
-            .next())
+            .map_err(|err| SuiError::invalid_input(err.to_string()))
     }
 }

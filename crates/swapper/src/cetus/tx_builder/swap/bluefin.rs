@@ -1,5 +1,5 @@
-use super::{finalize_swap, prepare_swap_inputs};
 use super::super::constants::MODULE_BLUEFIN;
+use super::{finalize_swap, prepare_swap_inputs};
 use crate::{
     SwapperError,
     cetus::{constants::BLUEFIN_GLOBAL_CONFIG, model::FlattenedPath},

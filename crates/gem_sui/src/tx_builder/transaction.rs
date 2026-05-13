@@ -54,7 +54,7 @@ pub fn build_input_coin(txb: &mut TransactionBuilder, coin_type: &str, amount: u
         return Err(SuiError::InsufficientBalance);
     }
 
-    let mut coin_args = from_coins.iter().map(|coin| Ok(txb.object(coin.to_input()))).collect::<Result<Vec<_>, SuiError>>()?;
+    let mut coin_args: Vec<_> = from_coins.iter().map(|coin| txb.object(coin.to_input())).collect();
     let coin = coin_args.first().copied().ok_or(SuiError::InsufficientBalance)?;
     if coin_args.len() > 1 {
         txb.merge_coins(coin, coin_args.split_off(1));
