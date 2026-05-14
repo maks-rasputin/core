@@ -135,10 +135,6 @@ where
         )
     }
 
-    async fn first_pool(&self, from: &str, to: &str) -> Option<DiscoveredPool> {
-        self.discover_direct_pools(from, to).await.into_iter().next()
-    }
-
     async fn find_route_hops(&self, from: &str, to: &str, swap_amount: u64) -> Result<Vec<Hop>, SwapperError> {
         let mut candidates: Vec<Vec<DiscoveredPool>> = self.discover_direct_pools(from, to).await.into_iter().map(|pool| vec![pool]).collect();
         for raw_intermediate in INTERMEDIATE_COIN_TYPES {
@@ -146,9 +142,11 @@ where
             if coin_type_matches(from, &intermediate) || coin_type_matches(to, &intermediate) {
                 continue;
             }
-            let (first, second) = futures::future::join(self.first_pool(from, &intermediate), self.first_pool(&intermediate, to)).await;
-            if let (Some(first), Some(second)) = (first, second) {
-                candidates.push(vec![first, second]);
+            let (firsts, seconds) = futures::future::join(self.discover_direct_pools(from, &intermediate), self.discover_direct_pools(&intermediate, to)).await;
+            for first in &firsts {
+                for second in &seconds {
+                    candidates.push(vec![first.clone(), second.clone()]);
+                }
             }
         }
         if candidates.is_empty() {

@@ -8,12 +8,15 @@ pub(super) const CETUS_SHARED_INIT_VERSION: u64 = 1_574_190;
 pub(super) const CETUS_GLOBAL_CONFIG: &str = "0xdaa46292632c3c4d8f31f23ea0f9b36a28ff3677e9684980e4438403a67a3d8f";
 pub(super) const CETUS_POOLS_REGISTRY: &str = "0xf699e7f2276f5c9a75944b37a0c5b5d9ddfd2471bf6242483b03ab2887d198d0";
 
+pub(super) const CETUS_PARTNER: &str = "0x08b1875b6541c847f05ed71d04cbcfa66e4e8619bf3b8923b07c5b5409433366";
+pub(super) const CETUS_PARTNER_INIT_VERSION: u64 = 507_739_678;
+
 pub(super) const MODULE_POOL: &str = "pool";
 pub(super) const MODULE_FACTORY: &str = "factory";
 
 pub(super) const FUNCTION_CALCULATE_SWAP_RESULT: &str = "calculate_swap_result";
-pub(super) const FUNCTION_FLASH_SWAP: &str = "flash_swap";
-pub(super) const FUNCTION_REPAY_FLASH_SWAP: &str = "repay_flash_swap";
+pub(super) const FUNCTION_FLASH_SWAP_WITH_PARTNER: &str = "flash_swap_with_partner";
+pub(super) const FUNCTION_REPAY_FLASH_SWAP_WITH_PARTNER: &str = "repay_flash_swap_with_partner";
 pub(super) const FUNCTION_NEW_POOL_KEY: &str = "new_pool_key";
 pub(super) const FUNCTION_POOL_SIMPLE_INFO: &str = "pool_simple_info";
 pub(super) const FUNCTION_POOL_ID: &str = "pool_id";

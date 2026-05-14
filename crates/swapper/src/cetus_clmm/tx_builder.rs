@@ -1,7 +1,8 @@
 use super::{
     constants::{
-        CETUS_CLMM_PUBLISHED_AT, CETUS_GLOBAL_CONFIG, CETUS_POOLS_REGISTRY, CETUS_SHARED_INIT_VERSION, FUNCTION_CALCULATE_SWAP_RESULT, FUNCTION_FLASH_SWAP, FUNCTION_NEW_POOL_KEY,
-        FUNCTION_POOL_ID, FUNCTION_POOL_SIMPLE_INFO, FUNCTION_REPAY_FLASH_SWAP, MAX_SQRT_PRICE_X64, MIN_SQRT_PRICE_X64, MODULE_FACTORY, MODULE_POOL,
+        CETUS_CLMM_PUBLISHED_AT, CETUS_GLOBAL_CONFIG, CETUS_PARTNER, CETUS_PARTNER_INIT_VERSION, CETUS_POOLS_REGISTRY, CETUS_SHARED_INIT_VERSION, FUNCTION_CALCULATE_SWAP_RESULT,
+        FUNCTION_FLASH_SWAP_WITH_PARTNER, FUNCTION_NEW_POOL_KEY, FUNCTION_POOL_ID, FUNCTION_POOL_SIMPLE_INFO, FUNCTION_REPAY_FLASH_SWAP_WITH_PARTNER, MAX_SQRT_PRICE_X64,
+        MIN_SQRT_PRICE_X64, MODULE_FACTORY, MODULE_POOL,
     },
     model::{FeeSide, Hop, PoolRoute},
 };
@@ -51,8 +52,11 @@ pub(super) async fn build_quote_data<C: Client + Clone + Send + Sync + Debug + '
 ) -> Result<SwapperQuoteData, SwapperError> {
     let sender = quote.request.wallet_address.as_str();
     let amount = quote.from_value.parse::<u64>()?;
-    let mut pinned = HashMap::from([(CETUS_GLOBAL_CONFIG.to_string(), CETUS_SHARED_INIT_VERSION)]);
-    let mut object_ids = vec![CETUS_GLOBAL_CONFIG.to_string()];
+    let mut pinned = HashMap::from([
+        (CETUS_GLOBAL_CONFIG.to_string(), CETUS_SHARED_INIT_VERSION),
+        (CETUS_PARTNER.to_string(), CETUS_PARTNER_INIT_VERSION),
+    ]);
+    let mut object_ids = vec![CETUS_GLOBAL_CONFIG.to_string(), CETUS_PARTNER.to_string()];
     for hop in &route.hops {
         pinned.insert(hop.pool_id.clone(), hop.pool_init_version);
         object_ids.push(hop.pool_id.clone());
@@ -171,6 +175,7 @@ fn build_transaction(
     }
 
     let global_config = resolver.shared_object(&mut txb, CETUS_GLOBAL_CONFIG, false).map_err(error)?;
+    let partner = resolver.shared_object(&mut txb, CETUS_PARTNER, true).map_err(error)?;
     let clock = txb.object(sui_clock_object_input());
 
     let mut current_balance = into_balance(&mut txb, route.input_coin_type(), swap_coin).map_err(error)?;
@@ -195,9 +200,9 @@ fn build_transaction(
             &mut txb,
             published_at,
             MODULE_POOL,
-            FUNCTION_FLASH_SWAP,
+            FUNCTION_FLASH_SWAP_WITH_PARTNER,
             &[&hop.coin_a, &hop.coin_b],
-            vec![global_config, pool, a2b_arg, by_amount_in_arg, amount_arg, sqrt_price_limit_arg, clock],
+            vec![global_config, pool, partner, a2b_arg, by_amount_in_arg, amount_arg, sqrt_price_limit_arg, clock],
         )
         .map_err(error)?
         .to_nested(3);
@@ -227,9 +232,9 @@ fn build_transaction(
             &mut txb,
             published_at,
             MODULE_POOL,
-            FUNCTION_REPAY_FLASH_SWAP,
+            FUNCTION_REPAY_FLASH_SWAP_WITH_PARTNER,
             &[&repay.hop.coin_a, &repay.hop.coin_b],
-            vec![global_config, repay.pool, pay_a, pay_b, repay.receipt],
+            vec![global_config, repay.pool, partner, pay_a, pay_b, repay.receipt],
         )
         .map_err(error)?;
     }
