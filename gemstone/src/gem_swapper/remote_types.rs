@@ -123,6 +123,7 @@ pub enum SwapperProvider {
     Chainflip,
     NearIntents,
     CetusAggregator,
+    CetusClmm,
     Relay,
     Hyperliquid,
     Orca,

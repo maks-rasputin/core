@@ -6,7 +6,7 @@ use std::{
 #[derive(Debug)]
 pub enum SuiError {
     InvalidInput(String),
-    InsufficientBalance,
+    InsufficientBalance { coin_type: String },
     NoGasCoins,
 }
 
@@ -14,7 +14,7 @@ impl Display for SuiError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::InvalidInput(message) => write!(f, "{message}"),
-            Self::InsufficientBalance => write!(f, "insufficient Sui coin balance"),
+            Self::InsufficientBalance { coin_type } => write!(f, "insufficient {coin_type} balance"),
             Self::NoGasCoins => write!(f, "No SUI coins available for gas"),
         }
     }

@@ -34,6 +34,7 @@ pub use tx_builder::{decode_transaction, stake::*, transfer::*, validate_and_has
 
 pub const SUI_SYSTEM_ID: &str = "sui_system";
 
+pub const SUI_FRAMEWORK_PACKAGE: &str = "0x2";
 pub const SUI_FRAMEWORK_PACKAGE_ID: u8 = 0x2;
 pub const SUI_SYSTEM_PACKAGE_ID: u8 = 0x3;
 pub const SUI_SYSTEM_STATE_OBJECT_ID: u8 = 0x5;

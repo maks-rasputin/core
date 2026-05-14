@@ -7423,6 +7423,7 @@ dependencies = [
  "alloy-sol-types",
  "async-trait",
  "base64",
+ "bcs 0.2.1",
  "bigdecimal",
  "bs58",
  "chrono",

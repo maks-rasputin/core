@@ -1,3 +1,4 @@
+pub mod balance;
 mod input;
 #[cfg(feature = "rpc")]
 pub(crate) mod object_resolver;
@@ -7,6 +8,7 @@ pub mod stake;
 mod transaction;
 pub mod transfer;
 
+pub use balance::{balance_value, balance_zero, destroy_zero_balance, from_balance, into_balance};
 pub use input::TransactionBuilderInput;
 #[cfg(feature = "rpc")]
 pub use object_resolver::ObjectResolver;

@@ -1,6 +1,6 @@
 use super::TransactionBuilderInput;
 use crate::{
-    SuiError, is_sui_coin,
+    SUI_FRAMEWORK_PACKAGE, SuiError, is_sui_coin,
     models::{CoinAsset, TxOutput},
 };
 use gem_encoding::decode_base64;
@@ -32,7 +32,7 @@ pub fn move_call(txb: &mut TransactionBuilder, package: &str, module: &str, func
 }
 
 pub fn zero_coin(txb: &mut TransactionBuilder, coin_type: &str) -> Result<Argument, SuiError> {
-    move_call(txb, "0x2", MODULE_COIN, FUNCTION_ZERO, &[coin_type], vec![])
+    move_call(txb, SUI_FRAMEWORK_PACKAGE, MODULE_COIN, FUNCTION_ZERO, &[coin_type], vec![])
 }
 
 pub fn build_input_coin(txb: &mut TransactionBuilder, coin_type: &str, amount: u64, from_coins: &[CoinAsset]) -> Result<Argument, SuiError> {
@@ -51,11 +51,14 @@ pub fn build_input_coin(txb: &mut TransactionBuilder, coin_type: &str, amount: u
         total.checked_add(balance).ok_or_else(|| SuiError::invalid_input("Sui coin balance overflow"))
     })?;
     if total < amount {
-        return Err(SuiError::InsufficientBalance);
+        return Err(SuiError::InsufficientBalance { coin_type: coin_type.to_string() });
     }
 
     let mut coin_args: Vec<_> = from_coins.iter().map(|coin| txb.object(coin.to_input())).collect();
-    let coin = coin_args.first().copied().ok_or(SuiError::InsufficientBalance)?;
+    let coin = coin_args
+        .first()
+        .copied()
+        .ok_or_else(|| SuiError::InsufficientBalance { coin_type: coin_type.to_string() })?;
     if coin_args.len() > 1 {
         txb.merge_coins(coin, coin_args.split_off(1));
     }

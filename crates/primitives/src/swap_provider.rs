@@ -28,7 +28,9 @@ pub enum SwapProvider {
     Mayan,
     Chainflip,
     NearIntents,
+    #[typeshare(skip)]
     CetusAggregator,
+    CetusClmm,
     Relay,
     Hyperliquid,
     Orca,
@@ -56,6 +58,7 @@ impl SwapProvider {
             | Self::Oku
             | Self::Wagmi
             | Self::CetusAggregator
+            | Self::CetusClmm
             | Self::StonfiV2
             | Self::Aerodrome
             | Self::Orca => false,
@@ -84,6 +87,7 @@ impl SwapProvider {
             | Self::Oku
             | Self::Wagmi
             | Self::CetusAggregator
+            | Self::CetusClmm
             | Self::StonfiV2
             | Self::Aerodrome
             | Self::Hyperliquid
@@ -103,7 +107,7 @@ impl SwapProvider {
             Self::Across => "Across",
             Self::Oku => "Oku",
             Self::Wagmi => "Wagmi",
-            Self::CetusAggregator => "Cetus",
+            Self::CetusAggregator | Self::CetusClmm => "Cetus",
             Self::StonfiV2 => "STON.fi",
             Self::Mayan => "Mayan",
             Self::Chainflip => "Chainflip",
@@ -124,6 +128,7 @@ impl SwapProvider {
             Self::Across => "Across v3",
             Self::Oku => "Oku",
             Self::StonfiV2 => "STON.fi v2",
+            Self::CetusAggregator | Self::CetusClmm => "Cetus",
             Self::Thorchain
             | Self::Jupiter
             | Self::Okx
@@ -131,7 +136,6 @@ impl SwapProvider {
             | Self::Mayan
             | Self::Chainflip
             | Self::NearIntents
-            | Self::CetusAggregator
             | Self::Aerodrome
             | Self::Relay
             | Self::Hyperliquid

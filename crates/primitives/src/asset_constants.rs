@@ -92,6 +92,8 @@ pub static AVALANCHE_USDC_ASSET_ID: LazyLock<AssetId> = LazyLock::new(|| AssetId
 pub const SUI_USDC_TOKEN_ID: &str = "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC";
 pub static SUI_USDC_ASSET_ID: LazyLock<AssetId> = LazyLock::new(|| AssetId::from_token(Chain::Sui, SUI_USDC_TOKEN_ID));
 
+pub const SUI_CETUS_TOKEN_ID: &str = "0x06864a6f921804860930db6ddbe2e16acdf8504495ea7481637a1c8b9a8fe54b::cetus::CETUS";
+
 pub const ARBITRUM_USDC_E_TOKEN_ID: &str = "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8";
 pub static ARBITRUM_USDC_E_ASSET_ID: LazyLock<AssetId> = LazyLock::new(|| AssetId::from_token(Chain::Arbitrum, ARBITRUM_USDC_E_TOKEN_ID));
 

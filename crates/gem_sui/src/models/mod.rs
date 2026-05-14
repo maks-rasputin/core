@@ -10,7 +10,7 @@ pub mod transaction;
 pub use coin::*;
 pub use coin_asset::{CoinAsset, CoinResponse};
 pub use core::*;
-pub use inspect::{InspectEffects, InspectEvent, InspectGasUsed, InspectResult};
+pub use inspect::{InspectCommandResult, InspectEffects, InspectEvent, InspectGasUsed, InspectResult, InspectReturnValue};
 pub use object_id::ObjectId;
 pub use staking::*;
 pub use transaction::*;

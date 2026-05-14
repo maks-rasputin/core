@@ -42,6 +42,10 @@ impl ObjectResolver {
         Ok(Self { shared_versions })
     }
 
+    pub fn initial_shared_version(&self, object_id: &str) -> Option<u64> {
+        self.shared_versions.get(object_id).copied()
+    }
+
     pub fn shared_object_input(&self, object_id: &str, mutable: bool) -> Result<ObjectInput, SuiError> {
         let version = self
             .shared_versions

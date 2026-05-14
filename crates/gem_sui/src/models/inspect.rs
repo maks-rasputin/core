@@ -7,7 +7,18 @@ pub struct InspectResult {
     pub effects: InspectEffects,
     pub events: serde_json::Value,
     pub error: Option<String>,
+    #[serde(default)]
+    pub results: Vec<InspectCommandResult>,
 }
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InspectCommandResult {
+    #[serde(default)]
+    pub return_values: Vec<InspectReturnValue>,
+}
+
+pub type InspectReturnValue = (Vec<u8>, String);
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
