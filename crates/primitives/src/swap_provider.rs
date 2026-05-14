@@ -28,7 +28,7 @@ pub enum SwapProvider {
     Mayan,
     Chainflip,
     NearIntents,
-    #[typeshare(skip)]
+    // TODO: delete CetusAggregator once mobile clients stop referencing it
     CetusAggregator,
     CetusClmm,
     Relay,
