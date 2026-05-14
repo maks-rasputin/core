@@ -1,5 +1,5 @@
 use gem_sui::SUI_COIN_TYPE_FULL;
-use primitives::asset_constants::{SUI_CETUS_TOKEN_ID, SUI_USDC_TOKEN_ID};
+use primitives::asset_constants::SUI_USDC_TOKEN_ID;
 
 pub(super) const CETUS_CLMM_PUBLISHED_AT: &str = "0x25ebb9a7c50eb17b3fa9c5a30fb8b5ad8f97caaf4928943acbcff7153dfee5e3";
 
@@ -57,17 +57,5 @@ pub(super) const KNOWN_POOLS: &[KnownPool] = &[
         coin_b: SUI_COIN_TYPE_FULL,
         pool_id: "0x03d7739b33fe221a830ff101042fa81fd19188feca04a335f7dea4e37c0fca81",
         pool_init_version: 373_502_515,
-    },
-    KnownPool {
-        coin_a: SUI_USDC_TOKEN_ID,
-        coin_b: SUI_CETUS_TOKEN_ID,
-        pool_id: "0xeee7dcdedebedc97fe8f62ebfe467c26dd36f068e537f071477bf8e0fa84b8d1",
-        pool_init_version: 797_958_771,
-    },
-    KnownPool {
-        coin_a: SUI_CETUS_TOKEN_ID,
-        coin_b: SUI_COIN_TYPE_FULL,
-        pool_id: "0xfb9b72266c119c97d5cb22be5403a68b1323a810a2a97bdb2aa9720148c6128a",
-        pool_init_version: 797_928_149,
     },
 ];
