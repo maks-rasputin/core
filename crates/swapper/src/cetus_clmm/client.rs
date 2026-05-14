@@ -123,19 +123,16 @@ where
     }
 
     async fn query_direct_pools(&self, from: &str, to: &str) -> Option<Vec<DiscoveredPool>> {
-        let attempts: Vec<(u32, String, String)> = CETUS_TICK_SPACINGS
-            .iter()
-            .flat_map(|tick| [(from, to), (to, from)].map(|(a, b)| (*tick, a.to_string(), b.to_string())))
-            .collect();
-        let inspects = attempts.iter().map(|(tick, a, b)| self.inspect_pool_id(a, b, *tick));
+        let (coin_a, coin_b) = canonical_pair_order(from, to);
+        let inspects = CETUS_TICK_SPACINGS.iter().map(|tick| self.inspect_pool_id(coin_a, coin_b, *tick));
         let results = futures::future::join_all(inspects).await;
         let mut candidates: Vec<(String, String, String)> = Vec::new();
         let mut seen: HashSet<String> = HashSet::new();
-        for ((_, coin_a, coin_b), result) in attempts.into_iter().zip(results) {
+        for result in results {
             match result {
                 Ok(Some(pool_id)) => {
                     if seen.insert(pool_id.clone()) {
-                        candidates.push((pool_id, coin_a, coin_b));
+                        candidates.push((pool_id, coin_a.to_string(), coin_b.to_string()));
                     }
                 }
                 Ok(None) => {}
@@ -218,6 +215,10 @@ where
     }
 }
 
+fn canonical_pair_order<'a>(a: &'a str, b: &'a str) -> (&'a str, &'a str) {
+    if a > b { (a, b) } else { (b, a) }
+}
+
 fn decode_quote_result(result: &InspectResult) -> Result<QuoteResult, SwapperError> {
     if result.error.is_some() {
         return Err(SwapperError::NoQuoteAvailable);
@@ -281,6 +282,20 @@ mod tests {
         bytes.push(1);
         bytes.extend_from_slice(&current_sqrt.to_le_bytes());
         bytes
+    }
+
+    #[test]
+    fn test_canonical_pair_order() {
+        let sui = gem_sui::SUI_COIN_TYPE_FULL;
+        let usdc = "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC";
+        let blue = "0xe1b45a0e641b9955a20aa0ad1c1f4ad86aad8afb07296d4085e349a50e90bdca::blue::BLUE";
+
+        assert_eq!(canonical_pair_order(usdc, sui), (usdc, sui));
+        assert_eq!(canonical_pair_order(sui, usdc), (usdc, sui));
+        assert_eq!(canonical_pair_order(blue, sui), (blue, sui));
+        assert_eq!(canonical_pair_order(sui, blue), (blue, sui));
+        assert_eq!(canonical_pair_order(blue, usdc), (blue, usdc));
+        assert_eq!(canonical_pair_order(usdc, blue), (blue, usdc));
     }
 
     #[test]
