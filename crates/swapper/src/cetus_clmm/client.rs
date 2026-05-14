@@ -1,6 +1,6 @@
 use super::{
     cache::PoolCache,
-    constants::{CETUS_TICK_SPACINGS, KNOWN_POOLS},
+    constants::{CETUS_ALL_TICK_SPACINGS, CETUS_PRIMARY_TICK_SPACINGS, KNOWN_POOLS},
     model::{DiscoveredPool, Hop, INTERMEDIATE_COIN_TYPES},
     tx_builder,
 };
@@ -18,11 +18,20 @@ use std::{
     sync::Arc,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(super) struct QuoteResult {
     pub amount_out: u64,
+    pub current_sqrt_price: u128,
     pub after_sqrt_price: u128,
     pub is_exceed: bool,
+}
+
+const DIRECT_PRICE_IMPACT_THRESHOLD_BPS: u32 = 50;
+
+#[derive(Debug, Default)]
+struct PhaseResult {
+    acceptable_direct: Option<(Vec<Hop>, u32)>,
+    best_route: Option<(Vec<Hop>, u32)>,
 }
 
 pub struct CetusClmm<C>
@@ -68,28 +77,87 @@ where
     }
 
     pub(super) async fn find_route_hops(&self, from: &str, to: &str, swap_amount: u64) -> Result<Vec<Hop>, SwapperError> {
-        let mut candidates: Vec<Vec<DiscoveredPool>> = self.discover_direct_pools(from, to).await.into_iter().map(|pool| vec![pool]).collect();
+        if let Some(cached_route) = self.pool_cache.get_route(from, to) {
+            let quotes = self.quote_candidates_batched(vec![cached_route], from, swap_amount).await;
+            if let Some((hops, _)) = quotes.into_iter().flatten().next() {
+                return Ok(hops);
+            }
+        }
+
+        let primary = self.try_route_with_ticks(from, to, swap_amount, CETUS_PRIMARY_TICK_SPACINGS).await;
+        if let Some((hops, _)) = primary.acceptable_direct {
+            self.cache_winning_route(from, to, &hops);
+            return Ok(hops);
+        }
+        if let Some((hops, impact)) = &primary.best_route
+            && *impact <= DIRECT_PRICE_IMPACT_THRESHOLD_BPS
+        {
+            self.cache_winning_route(from, to, hops);
+            return Ok(hops.clone());
+        }
+
+        let expanded = self.try_route_with_ticks(from, to, swap_amount, CETUS_ALL_TICK_SPACINGS).await;
+        let (hops, _) = expanded
+            .acceptable_direct
+            .or(expanded.best_route)
+            .or(primary.best_route)
+            .ok_or(SwapperError::NoQuoteAvailable)?;
+        self.cache_winning_route(from, to, &hops);
+        Ok(hops)
+    }
+
+    async fn try_route_with_ticks(&self, from: &str, to: &str, swap_amount: u64, ticks: &[u32]) -> PhaseResult {
+        let direct_candidates: Vec<Vec<DiscoveredPool>> = self.discover_direct_pools(from, to, ticks).await.into_iter().map(|pool| vec![pool]).collect();
+        let direct_quotes = self.quote_candidates_batched(direct_candidates, from, swap_amount).await;
+        let acceptable_direct = direct_quotes
+            .iter()
+            .filter_map(|q| q.as_ref())
+            .filter(|(_, impact)| *impact < DIRECT_PRICE_IMPACT_THRESHOLD_BPS)
+            .max_by_key(|(hops, _)| hops.last().map(|h| h.amount_out).unwrap_or_default())
+            .cloned();
+        if acceptable_direct.is_some() {
+            return PhaseResult {
+                acceptable_direct,
+                best_route: None,
+            };
+        }
+
+        let mut multi_hop_candidates: Vec<Vec<DiscoveredPool>> = Vec::new();
         for raw_intermediate in INTERMEDIATE_COIN_TYPES {
             let intermediate = full_coin_type(raw_intermediate);
             if coin_type_matches(from, &intermediate) || coin_type_matches(to, &intermediate) {
                 continue;
             }
-            let (firsts, seconds) = futures::future::join(self.discover_direct_pools(from, &intermediate), self.discover_direct_pools(&intermediate, to)).await;
+            let (firsts, seconds) = futures::future::join(self.discover_direct_pools(from, &intermediate, ticks), self.discover_direct_pools(&intermediate, to, ticks)).await;
             for first in &firsts {
                 for second in &seconds {
-                    candidates.push(vec![first.clone(), second.clone()]);
+                    multi_hop_candidates.push(vec![first.clone(), second.clone()]);
                 }
             }
         }
-        if candidates.is_empty() {
-            return Err(SwapperError::NoQuoteAvailable);
-        }
-        let quotes = futures::future::join_all(candidates.into_iter().map(|pools| self.quote_candidate(pools, from, swap_amount))).await;
-        quotes
+        let multi_hop_quotes = self.quote_candidates_batched(multi_hop_candidates, from, swap_amount).await;
+        let best_route = direct_quotes
             .into_iter()
+            .chain(multi_hop_quotes)
             .flatten()
-            .max_by_key(|hops| hops.last().map(|h| h.amount_out).unwrap_or_default())
-            .ok_or(SwapperError::NoQuoteAvailable)
+            .max_by_key(|(hops, _)| hops.last().map(|h| h.amount_out).unwrap_or_default());
+        PhaseResult {
+            acceptable_direct: None,
+            best_route,
+        }
+    }
+
+    fn cache_winning_route(&self, from: &str, to: &str, hops: &[Hop]) {
+        let route: Vec<DiscoveredPool> = hops
+            .iter()
+            .map(|hop| DiscoveredPool {
+                pool_id: hop.pool_id.clone(),
+                pool_init_version: hop.pool_init_version,
+                coin_a: hop.coin_a.clone(),
+                coin_b: hop.coin_b.clone(),
+            })
+            .collect();
+        self.pool_cache.put_route(from, to, &route);
     }
 
     fn known_pools(from: &str, to: &str) -> Vec<DiscoveredPool> {
@@ -107,24 +175,26 @@ where
             .collect()
     }
 
-    async fn discover_direct_pools(&self, from: &str, to: &str) -> Vec<DiscoveredPool> {
+    async fn discover_direct_pools(&self, from: &str, to: &str, ticks: &[u32]) -> Vec<DiscoveredPool> {
         let known = Self::known_pools(from, to);
         if !known.is_empty() {
             return known;
         }
-        if let Some(cached) = self.pool_cache.get(from, to) {
-            return cached;
+        let (cached_pools, explored) = self.pool_cache.get(from, to).unwrap_or_default();
+        let missing: Vec<u32> = ticks.iter().filter(|t| !explored.contains(t)).copied().collect();
+        if missing.is_empty() {
+            return cached_pools;
         }
-        let Some(pools) = self.query_direct_pools(from, to).await else {
-            return Vec::new();
+        let Some(new_pools) = self.query_direct_pools(from, to, &missing).await else {
+            return cached_pools;
         };
-        self.pool_cache.put(from, to, &pools);
-        pools
+        self.pool_cache.put(from, to, &new_pools, &missing);
+        self.pool_cache.get(from, to).map(|(pools, _)| pools).unwrap_or_default()
     }
 
-    async fn query_direct_pools(&self, from: &str, to: &str) -> Option<Vec<DiscoveredPool>> {
+    async fn query_direct_pools(&self, from: &str, to: &str, ticks: &[u32]) -> Option<Vec<DiscoveredPool>> {
         let (coin_a, coin_b) = canonical_pair_order(from, to);
-        let inspects = CETUS_TICK_SPACINGS.iter().map(|tick| self.inspect_pool_id(coin_a, coin_b, *tick));
+        let inspects = ticks.iter().map(|tick| self.inspect_pool_id(coin_a, coin_b, *tick));
         let results = futures::future::join_all(inspects).await;
         let mut candidates: Vec<(String, String, String)> = Vec::new();
         let mut seen: HashSet<String> = HashSet::new();
@@ -160,38 +230,78 @@ where
         )
     }
 
-    async fn quote_candidate(&self, pools: Vec<DiscoveredPool>, from: &str, swap_amount: u64) -> Option<Vec<Hop>> {
-        let hop_count = pools.len();
-        let mut hops: Vec<Hop> = Vec::with_capacity(hop_count);
-        let mut current_coin = from.to_string();
-        let mut current_amount = swap_amount;
-        for (idx, pool) in pools.into_iter().enumerate() {
-            let mut hop = pool.into_hop(&current_coin, current_amount);
-            let quote = self.inspect_swap_quote(&hop, current_amount).await.ok()?;
-            if quote.amount_out == 0 || quote.is_exceed {
-                return None;
-            }
-            hop.amount_out = quote.amount_out;
-            hop.after_sqrt_price = quote.after_sqrt_price;
-            if idx + 1 < hop_count {
-                current_amount = quote.amount_out;
-                current_coin = hop.output_coin_type().to_string();
-            }
-            hops.push(hop);
+    async fn quote_candidates_batched(&self, candidates: Vec<Vec<DiscoveredPool>>, from: &str, swap_amount: u64) -> Vec<Option<(Vec<Hop>, u32)>> {
+        if candidates.is_empty() {
+            return Vec::new();
         }
-        Some(hops)
+        if candidates[0].len() == 1 {
+            self.quote_direct_batched(candidates, from, swap_amount).await
+        } else {
+            self.quote_multi_hop_fused(candidates, from, swap_amount).await
+        }
+    }
+
+    async fn quote_direct_batched(&self, candidates: Vec<Vec<DiscoveredPool>>, from: &str, swap_amount: u64) -> Vec<Option<(Vec<Hop>, u32)>> {
+        let hops: Vec<Hop> = candidates.iter().map(|pools| pools[0].clone().into_hop(from, swap_amount)).collect();
+        let inputs: Vec<(&Hop, u64)> = hops.iter().map(|hop| (hop, swap_amount)).collect();
+        let quote_results = self.inspect_batch_quotes(&inputs).await.unwrap_or_else(|_| vec![None; candidates.len()]);
+
+        hops.into_iter()
+            .zip(quote_results.into_iter())
+            .map(|(mut hop, quote)| {
+                let q = quote?;
+                if q.amount_out == 0 || q.is_exceed {
+                    return None;
+                }
+                hop.amount_out = q.amount_out;
+                hop.after_sqrt_price = q.after_sqrt_price;
+                let impact = price_impact_bps(q.current_sqrt_price, q.after_sqrt_price);
+                Some((vec![hop], impact))
+            })
+            .collect()
+    }
+
+    async fn quote_multi_hop_fused(&self, candidates: Vec<Vec<DiscoveredPool>>, from: &str, swap_amount: u64) -> Vec<Option<(Vec<Hop>, u32)>> {
+        let hop_pairs: Vec<(Hop, Hop)> = candidates
+            .iter()
+            .map(|pools| {
+                let hop1 = pools[0].clone().into_hop(from, swap_amount);
+                let intermediate = hop1.output_coin_type().to_string();
+                let hop2 = pools[1].clone().into_hop(&intermediate, 0);
+                (hop1, hop2)
+            })
+            .collect();
+        let inputs: Vec<(&Hop, &Hop, u64)> = hop_pairs.iter().map(|(h1, h2)| (h1, h2, swap_amount)).collect();
+        let fused_results = self.inspect_batch_multi_hop_quotes(&inputs).await.unwrap_or_else(|_| vec![(None, None); candidates.len()]);
+
+        hop_pairs
+            .into_iter()
+            .zip(fused_results.into_iter())
+            .map(|((mut hop1, mut hop2), (q1, q2))| {
+                let q1 = q1?;
+                if q1.amount_out == 0 || q1.is_exceed {
+                    return None;
+                }
+                let q2 = q2?;
+                if q2.amount_out == 0 || q2.is_exceed {
+                    return None;
+                }
+                hop1.amount_out = q1.amount_out;
+                hop1.after_sqrt_price = q1.after_sqrt_price;
+                hop2.amount_in = q1.amount_out;
+                hop2.amount_out = q2.amount_out;
+                hop2.after_sqrt_price = q2.after_sqrt_price;
+                let max_impact = price_impact_bps(q1.current_sqrt_price, q1.after_sqrt_price).max(price_impact_bps(q2.current_sqrt_price, q2.after_sqrt_price));
+                Some((vec![hop1, hop2], max_impact))
+            })
+            .collect()
     }
 
     async fn inspect_pool_id(&self, coin_a: &str, coin_b: &str, tick_spacing: u32) -> Result<Option<String>, SwapperError> {
         let transaction = tx_builder::build_pool_id_inspect(coin_a, coin_b, tick_spacing)?;
-        let result = self
-            .sui_client
-            .inspect_transaction_block(EMPTY_ADDRESS, &transaction, None)
-            .await
-            .map_err(|err| SwapperError::ComputeQuoteError(err.to_string()))?;
-        if result.error.is_some() {
+        let Some(result) = self.run_inspect(transaction).await? else {
             return Ok(None);
-        }
+        };
         let bytes = result
             .results
             .last()
@@ -204,14 +314,38 @@ where
         Ok(Some(format!("0x{}", hex::encode(bytes))))
     }
 
-    async fn inspect_swap_quote(&self, hop: &Hop, amount_in: u64) -> Result<QuoteResult, SwapperError> {
-        let transaction = tx_builder::build_quote_inspect(hop, amount_in)?;
+    async fn inspect_batch_quotes(&self, quotes: &[(&Hop, u64)]) -> Result<Vec<Option<QuoteResult>>, SwapperError> {
+        if quotes.is_empty() {
+            return Ok(Vec::new());
+        }
+        let result = self
+            .run_inspect(tx_builder::build_batch_quote_inspect(quotes)?)
+            .await?
+            .ok_or(SwapperError::NoQuoteAvailable)?;
+        Ok((0..quotes.len()).map(|i| quote_result_at(&result, i)).collect())
+    }
+
+    async fn inspect_batch_multi_hop_quotes(&self, routes: &[(&Hop, &Hop, u64)]) -> Result<Vec<(Option<QuoteResult>, Option<QuoteResult>)>, SwapperError> {
+        if routes.is_empty() {
+            return Ok(Vec::new());
+        }
+        let result = self
+            .run_inspect(tx_builder::build_batch_multi_hop_quote_inspect(routes)?)
+            .await?
+            .ok_or(SwapperError::NoQuoteAvailable)?;
+        Ok((0..routes.len()).map(|i| (quote_result_at(&result, i * 3), quote_result_at(&result, i * 3 + 2))).collect())
+    }
+
+    async fn run_inspect(&self, transaction: Vec<u8>) -> Result<Option<InspectResult>, SwapperError> {
         let result = self
             .sui_client
             .inspect_transaction_block(EMPTY_ADDRESS, &transaction, None)
             .await
             .map_err(|err| SwapperError::ComputeQuoteError(err.to_string()))?;
-        decode_quote_result(&result)
+        if result.error.is_some() {
+            return Ok(None);
+        }
+        Ok(Some(result))
     }
 }
 
@@ -219,17 +353,8 @@ fn canonical_pair_order<'a>(a: &'a str, b: &'a str) -> (&'a str, &'a str) {
     if a > b { (a, b) } else { (b, a) }
 }
 
-fn decode_quote_result(result: &InspectResult) -> Result<QuoteResult, SwapperError> {
-    if result.error.is_some() {
-        return Err(SwapperError::NoQuoteAvailable);
-    }
-    let bytes = result
-        .results
-        .first()
-        .and_then(|command| command.return_values.first())
-        .map(|(bytes, _)| bytes)
-        .ok_or_else(|| SwapperError::ComputeQuoteError("Cetus CLMM quote inspect returned no value".into()))?;
-    if bytes.len() < 49 {
+fn decode_quote_result_bytes(bytes: &[u8]) -> Result<QuoteResult, SwapperError> {
+    if bytes.len() < 66 {
         return Err(SwapperError::ComputeQuoteError("Cetus CLMM quote inspect returned truncated CalculatedSwapResult".into()));
     }
     let amount_out = u64::from_le_bytes(
@@ -243,18 +368,43 @@ fn decode_quote_result(result: &InspectResult) -> Result<QuoteResult, SwapperErr
             .map_err(|_| SwapperError::ComputeQuoteError("Cetus CLMM after_sqrt_price decode failed".into()))?,
     );
     let is_exceed = bytes[48] != 0;
+    let current_sqrt_price = u128::from_le_bytes(
+        bytes[50..66]
+            .try_into()
+            .map_err(|_| SwapperError::ComputeQuoteError("Cetus CLMM current_sqrt_price decode failed".into()))?,
+    );
     Ok(QuoteResult {
         amount_out,
+        current_sqrt_price,
         after_sqrt_price,
         is_exceed,
     })
+}
+
+fn price_impact_bps(current_sqrt_price: u128, after_sqrt_price: u128) -> u32 {
+    if current_sqrt_price == 0 {
+        return u32::MAX;
+    }
+    let (high, low) = if current_sqrt_price >= after_sqrt_price {
+        (current_sqrt_price, after_sqrt_price)
+    } else {
+        (after_sqrt_price, current_sqrt_price)
+    };
+    let delta = high - low;
+    let bps = delta.saturating_mul(20_000) / current_sqrt_price;
+    u32::try_from(bps).unwrap_or(u32::MAX)
+}
+
+fn quote_result_at(result: &InspectResult, cmd_idx: usize) -> Option<QuoteResult> {
+    let bytes = result.results.get(cmd_idx).and_then(|cmd| cmd.return_values.first()).map(|(bytes, _)| bytes)?;
+    decode_quote_result_bytes(bytes).ok()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn inspect_result(bytes: Vec<u8>) -> InspectResult {
+    fn inspect_result_many(per_command: Vec<Vec<u8>>) -> InspectResult {
         InspectResult {
             effects: gem_sui::models::InspectEffects {
                 gas_used: gem_sui::models::InspectGasUsed {
@@ -265,9 +415,12 @@ mod tests {
             },
             events: serde_json::Value::Null,
             error: None,
-            results: vec![gem_sui::models::InspectCommandResult {
-                return_values: vec![(bytes, "CalculatedSwapResult".into())],
-            }],
+            results: per_command
+                .into_iter()
+                .map(|bytes| gem_sui::models::InspectCommandResult {
+                    return_values: vec![(bytes, "CalculatedSwapResult".into())],
+                })
+                .collect(),
         }
     }
 
@@ -285,6 +438,15 @@ mod tests {
     }
 
     #[test]
+    fn test_price_impact_bps() {
+        assert_eq!(price_impact_bps(1_000_000, 1_000_000), 0);
+        assert_eq!(price_impact_bps(1_000_000, 995_000), 100);
+        assert_eq!(price_impact_bps(995_000, 1_000_000), 100);
+        assert_eq!(price_impact_bps(1_000_000, 990_000), 200);
+        assert_eq!(price_impact_bps(0, 1_000_000), u32::MAX);
+    }
+
+    #[test]
     fn test_canonical_pair_order() {
         let sui = gem_sui::SUI_COIN_TYPE_FULL;
         let usdc = "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC";
@@ -299,19 +461,36 @@ mod tests {
     }
 
     #[test]
-    fn test_decode_quote_result() {
+    fn test_quote_result_at_extracts_per_command() {
+        let current = 521_723_622_374_070_550_528_u128;
+        let after = 521_460_761_563_383_315_264_u128;
+        let bytes_a = calc_swap_bytes(100_000, current, after, false);
+        let bytes_b = calc_swap_bytes(200_000, current, after, true);
+        let bytes_c = calc_swap_bytes(300_000, current, after, false);
+        let result = inspect_result_many(vec![bytes_a, bytes_b, bytes_c]);
+
+        assert_eq!(quote_result_at(&result, 0).unwrap().amount_out, 100_000);
+        assert!(!quote_result_at(&result, 0).unwrap().is_exceed);
+        assert_eq!(quote_result_at(&result, 1).unwrap().amount_out, 200_000);
+        assert!(quote_result_at(&result, 1).unwrap().is_exceed);
+        assert_eq!(quote_result_at(&result, 2).unwrap().amount_out, 300_000);
+        assert!(quote_result_at(&result, 3).is_none());
+    }
+
+    #[test]
+    fn test_decode_quote_result_bytes() {
         let current = 521_723_622_374_070_550_528_u128;
         let after = 521_460_761_563_383_315_264_u128;
         let bytes = calc_swap_bytes(796_985_864, current, after, false);
-        let decoded = decode_quote_result(&inspect_result(bytes)).unwrap();
+        let decoded = decode_quote_result_bytes(&bytes).unwrap();
         assert_eq!(decoded.amount_out, 796_985_864);
         assert_eq!(decoded.after_sqrt_price, after);
         assert!(!decoded.is_exceed);
 
         let exceeded = calc_swap_bytes(796_985_864, current, after, true);
-        assert!(decode_quote_result(&inspect_result(exceeded)).unwrap().is_exceed);
+        assert!(decode_quote_result_bytes(&exceeded).unwrap().is_exceed);
 
-        let truncated = decode_quote_result(&inspect_result(vec![0u8; 16]));
+        let truncated = decode_quote_result_bytes(&[0u8; 16]);
         match truncated {
             Err(SwapperError::ComputeQuoteError(_)) => {}
             other => panic!("expected ComputeQuoteError, got {other:?}"),

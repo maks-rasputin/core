@@ -15,6 +15,7 @@ pub(super) const MODULE_POOL: &str = "pool";
 pub(super) const MODULE_FACTORY: &str = "factory";
 
 pub(super) const FUNCTION_CALCULATE_SWAP_RESULT: &str = "calculate_swap_result";
+pub(super) const FUNCTION_CALCULATED_SWAP_RESULT_AMOUNT_OUT: &str = "calculated_swap_result_amount_out";
 pub(super) const FUNCTION_FLASH_SWAP_WITH_PARTNER: &str = "flash_swap_with_partner";
 pub(super) const FUNCTION_REPAY_FLASH_SWAP_WITH_PARTNER: &str = "repay_flash_swap_with_partner";
 pub(super) const FUNCTION_NEW_POOL_KEY: &str = "new_pool_key";
@@ -24,7 +25,8 @@ pub(super) const FUNCTION_POOL_ID: &str = "pool_id";
 pub(super) const MIN_SQRT_PRICE_X64: u128 = 4_295_048_016;
 pub(super) const MAX_SQRT_PRICE_X64: u128 = 79_226_673_515_401_279_992_447_579_055;
 
-pub(super) const CETUS_TICK_SPACINGS: &[u32] = &[10, 60, 200];
+pub(super) const CETUS_PRIMARY_TICK_SPACINGS: &[u32] = &[60, 200];
+pub(super) const CETUS_ALL_TICK_SPACINGS: &[u32] = &[60, 200, 10, 2, 40];
 
 pub(super) struct KnownPool {
     pub coin_a: &'static str,

@@ -1,8 +1,8 @@
 use super::{
     constants::{
         CETUS_CLMM_PUBLISHED_AT, CETUS_GLOBAL_CONFIG, CETUS_PARTNER, CETUS_PARTNER_INIT_VERSION, CETUS_POOLS_REGISTRY, CETUS_SHARED_INIT_VERSION, FUNCTION_CALCULATE_SWAP_RESULT,
-        FUNCTION_FLASH_SWAP_WITH_PARTNER, FUNCTION_NEW_POOL_KEY, FUNCTION_POOL_ID, FUNCTION_POOL_SIMPLE_INFO, FUNCTION_REPAY_FLASH_SWAP_WITH_PARTNER, MAX_SQRT_PRICE_X64,
-        MIN_SQRT_PRICE_X64, MODULE_FACTORY, MODULE_POOL,
+        FUNCTION_CALCULATED_SWAP_RESULT_AMOUNT_OUT, FUNCTION_FLASH_SWAP_WITH_PARTNER, FUNCTION_NEW_POOL_KEY, FUNCTION_POOL_ID, FUNCTION_POOL_SIMPLE_INFO,
+        FUNCTION_REPAY_FLASH_SWAP_WITH_PARTNER, MAX_SQRT_PRICE_X64, MIN_SQRT_PRICE_X64, MODULE_FACTORY, MODULE_POOL,
     },
     model::{FeeSide, Hop, PoolRoute},
 };
@@ -61,25 +61,22 @@ pub(super) async fn build_quote_data<C: Client + Clone + Send + Sync + Debug + '
         pinned.insert(hop.pool_id.clone(), hop.pool_init_version);
         object_ids.push(hop.pool_id.clone());
     }
-    let prefetched = PrefetchedTransactionData::prefetch(
-        client,
-        sender,
-        route.input_coin_type(),
-        route.output_coin_type(),
-        object_ids,
-        &pinned,
-        ESTIMATION_GAS_BUDGET,
-    )
-    .await
-    .map_err(|err| SwapperError::TransactionError(err.to_string()))?;
+    let PrefetchedTransactionData {
+        transaction,
+        input_coins,
+        resolver,
+        ..
+    } = PrefetchedTransactionData::prefetch(client, sender, route.input_coin_type(), None, object_ids, &pinned, ESTIMATION_GAS_BUDGET)
+        .await
+        .map_err(|err| SwapperError::TransactionError(err.to_string()))?;
 
     let input = BuildInput {
-        transaction: prefetched.transaction.clone(),
+        transaction,
         amount,
-        from_coins: &prefetched.input_coins,
+        from_coins: &input_coins,
     };
 
-    let estimate = build_transaction(&prefetched.resolver, quote, route, referral_fee, published_at, &input)?;
+    let estimate = build_transaction(&resolver, quote, route, referral_fee, published_at, &input)?;
     let dry_run = client
         .dry_run(estimate.base64_encoded())
         .await
@@ -100,7 +97,7 @@ pub(super) async fn build_quote_data<C: Client + Clone + Send + Sync + Debug + '
         .calculate_gas_budget()
         .map_err(|err| SwapperError::TransactionError(err.to_string()))?;
     let gas_budget = fee * GAS_BUDGET_MULTIPLIER / 100;
-    let output = build_transaction(&prefetched.resolver, quote, route, referral_fee, published_at, &input.with_gas_budget(gas_budget))?;
+    let output = build_transaction(&resolver, quote, route, referral_fee, published_at, &input.with_gas_budget(gas_budget))?;
 
     Ok(SwapperQuoteData::new_contract(
         String::new(),
@@ -111,21 +108,56 @@ pub(super) async fn build_quote_data<C: Client + Clone + Send + Sync + Debug + '
     ))
 }
 
-pub(super) fn build_quote_inspect(hop: &Hop, amount_in: u64) -> Result<Vec<u8>, SwapperError> {
+pub(super) fn build_batch_quote_inspect(quotes: &[(&Hop, u64)]) -> Result<Vec<u8>, SwapperError> {
     let mut txb = TransactionBuilder::new();
-    let pool = txb.object(shared_object_input(&hop.pool_id, hop.pool_init_version, false)?);
-    let a2b = txb.pure(&hop.a2b);
-    let by_amount_in = txb.pure(&true);
-    let amount = txb.pure(&amount_in);
-    move_call(
-        &mut txb,
-        CETUS_CLMM_PUBLISHED_AT,
-        MODULE_POOL,
-        FUNCTION_CALCULATE_SWAP_RESULT,
-        &[&hop.coin_a, &hop.coin_b],
-        vec![pool, a2b, by_amount_in, amount],
-    )
-    .map_err(error)?;
+    for (hop, amount_in) in quotes {
+        let pool = txb.object(shared_object_input(&hop.pool_id, hop.pool_init_version, false)?);
+        let a2b = txb.pure(&hop.a2b);
+        let by_amount_in = txb.pure(&true);
+        let amount = txb.pure(amount_in);
+        move_call(
+            &mut txb,
+            CETUS_CLMM_PUBLISHED_AT,
+            MODULE_POOL,
+            FUNCTION_CALCULATE_SWAP_RESULT,
+            &[&hop.coin_a, &hop.coin_b],
+            vec![pool, a2b, by_amount_in, amount],
+        )
+        .map_err(error)?;
+    }
+    inspect_transaction_kind_bytes(txb)
+}
+
+pub(super) fn build_batch_multi_hop_quote_inspect(routes: &[(&Hop, &Hop, u64)]) -> Result<Vec<u8>, SwapperError> {
+    let mut txb = TransactionBuilder::new();
+    for (hop1, hop2, amount_in) in routes {
+        let pool1 = txb.object(shared_object_input(&hop1.pool_id, hop1.pool_init_version, false)?);
+        let a2b1 = txb.pure(&hop1.a2b);
+        let by_amount_in_1 = txb.pure(&true);
+        let amount = txb.pure(amount_in);
+        let csr1 = move_call(
+            &mut txb,
+            CETUS_CLMM_PUBLISHED_AT,
+            MODULE_POOL,
+            FUNCTION_CALCULATE_SWAP_RESULT,
+            &[&hop1.coin_a, &hop1.coin_b],
+            vec![pool1, a2b1, by_amount_in_1, amount],
+        )
+        .map_err(error)?;
+        let amount2 = move_call(&mut txb, CETUS_CLMM_PUBLISHED_AT, MODULE_POOL, FUNCTION_CALCULATED_SWAP_RESULT_AMOUNT_OUT, &[], vec![csr1]).map_err(error)?;
+        let pool2 = txb.object(shared_object_input(&hop2.pool_id, hop2.pool_init_version, false)?);
+        let a2b2 = txb.pure(&hop2.a2b);
+        let by_amount_in_2 = txb.pure(&true);
+        move_call(
+            &mut txb,
+            CETUS_CLMM_PUBLISHED_AT,
+            MODULE_POOL,
+            FUNCTION_CALCULATE_SWAP_RESULT,
+            &[&hop2.coin_a, &hop2.coin_b],
+            vec![pool2, a2b2, by_amount_in_2, amount2],
+        )
+        .map_err(error)?;
+    }
     inspect_transaction_kind_bytes(txb)
 }
 

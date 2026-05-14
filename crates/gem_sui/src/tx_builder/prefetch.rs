@@ -16,15 +16,21 @@ impl PrefetchedTransactionData {
         client: &SuiClient<C>,
         sender: &str,
         input_coin_type: &str,
-        output_coin_type: &str,
+        output_coin_type: Option<&str>,
         object_ids: Vec<String>,
         pinned: &HashMap<String, u64>,
         gas_budget: u64,
     ) -> Result<Self, SuiError> {
+        let output_coins_fut = async {
+            match output_coin_type {
+                Some(coin_type) => get_user_coins(client, sender, coin_type).await,
+                None => Ok(Vec::new()),
+            }
+        };
         let (transaction, input_coins, output_coins, resolver) = try_join!(
             TransactionBuilderInput::prefetch(client, sender, gas_budget),
             get_user_coins(client, sender, input_coin_type),
-            get_user_coins(client, sender, output_coin_type),
+            output_coins_fut,
             ObjectResolver::prefetch(client, object_ids, pinned),
         )?;
 
