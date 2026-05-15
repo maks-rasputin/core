@@ -113,6 +113,10 @@ impl GemGateway {
         Ok(self.status_provider.get(chain, request).await?)
     }
 
+    pub async fn get_transaction_swap_status(&self, chain: Chain, request: GemTransactionSwapStateRequest) -> Result<GemTransactionUpdate, GatewayError> {
+        Ok(self.status_provider.get_swap_status(chain, request).await?)
+    }
+
     pub async fn get_chain_id(&self, chain: Chain) -> Result<String, GatewayError> {
         self.with_provider(chain, |provider| async move { provider.get_chain_id().await }).await
     }

@@ -60,7 +60,7 @@ mod chain_integration_tests {
     async fn test_bitcoin_get_transactions_status() {
         let bitcoin_client = create_bitcoin_test_client();
 
-        let request = TransactionStateRequest::new_id(TEST_TRANSACTION_ID.to_string());
+        let request = TransactionStateRequest::mock_with_id(TEST_TRANSACTION_ID);
         let update = bitcoin_client.get_transaction_status(request).await.unwrap();
 
         println!("State: {:?}", update.state);

@@ -11,12 +11,12 @@ use crate::{provider::transaction_state_mapper::map_transaction_status, rpc::cli
 impl<C: Client> ChainTransactionState for PolkadotClient<C> {
     async fn get_transaction_status(&self, request: TransactionStateRequest) -> Result<TransactionUpdate, Box<dyn Error + Sync + Send>> {
         let block_number = request.block_number;
-        if block_number <= 0 {
+        if block_number == 0 {
             return Err("Invalid block number".into());
         }
 
         let block_head = self.get_block_head().await?;
-        let from_block = block_number as u64;
+        let from_block = block_number;
         let to_block = calculate_to_block(block_head.number, from_block);
 
         let blocks = self.get_blocks(&from_block.to_string(), &to_block.to_string()).await?;

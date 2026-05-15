@@ -598,10 +598,9 @@ impl Swapper for Across {
                 })
             }
         } else {
-            let metadata = Self::build_swap_metadata(&deposit, origin_chain_id);
             Ok(SwapResult {
-                status: primitives::swap::SwapStatus::Completed,
-                metadata,
+                status: primitives::swap::SwapStatus::Pending,
+                metadata: None,
             })
         }
     }

@@ -35,7 +35,7 @@ mod tests {
 
     #[test]
     fn test_map_transaction_status_confirmed() {
-        let request = TransactionStateRequest::new_id("hash".to_string());
+        let request = TransactionStateRequest::mock_with_id("hash");
         let transactions: MessageTransactions = serde_json::from_str(include_str!("../../testdata/transaction_transfer_state_success.json")).unwrap();
         let traces = TraceResponse::mock(transactions.transactions.first().unwrap().clone(), false, vec![]);
 
@@ -46,7 +46,7 @@ mod tests {
 
     #[test]
     fn test_ton_transaction_jetton_transfer_reverted() {
-        let request = TransactionStateRequest::new_id("hash".to_string());
+        let request = TransactionStateRequest::mock_with_id("hash");
         let transactions: MessageTransactions = serde_json::from_str(include_str!("../../testdata/transaction_transfer_jetton_error_2.json")).unwrap();
         let traces = TraceResponse::mock(transactions.transactions.first().unwrap().clone(), false, vec![]);
 
@@ -57,7 +57,7 @@ mod tests {
 
     #[test]
     fn test_map_transaction_status_success_trace_action() {
-        let request = TransactionStateRequest::new_id(SUCCESS_SWAP_MESSAGE_HASH.to_string());
+        let request = TransactionStateRequest::mock_with_id(SUCCESS_SWAP_MESSAGE_HASH);
         let traces = TraceResponse::mock_block_trace(0);
 
         let update = map_transaction_status(request, traces).unwrap();
@@ -68,7 +68,7 @@ mod tests {
 
     #[test]
     fn test_map_transaction_status_failed_trace_action() {
-        let request = TransactionStateRequest::new_id(FAILED_SWAP_MESSAGE_HASH.to_string());
+        let request = TransactionStateRequest::mock_with_id(FAILED_SWAP_MESSAGE_HASH);
         let traces = TraceResponse::mock_block_trace(1);
         let transaction = traces.root_transaction().unwrap().clone();
 
@@ -88,7 +88,7 @@ mod tests {
 
     #[test]
     fn test_map_transaction_status_incomplete_trace() {
-        let request = TransactionStateRequest::new_id("hash".to_string());
+        let request = TransactionStateRequest::mock_with_id("hash");
         let transactions: MessageTransactions = serde_json::from_str(include_str!("../../testdata/transaction_transfer_state_success.json")).unwrap();
         let traces = TraceResponse::mock(
             transactions.transactions.first().unwrap().clone(),

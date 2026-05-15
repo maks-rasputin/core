@@ -1,9 +1,10 @@
 use crate::models::*;
+use chrono::{DateTime, Utc};
 use num_bigint::BigInt;
 use primitives::contract_call_data::ContractCallData;
 use primitives::{
-    AccountDataType, Asset, EarnType, FeeOption, GasPriceType, HyperliquidOrder, PerpetualConfirmData, PerpetualDirection, PerpetualMarginType, PerpetualProvider, PerpetualType,
-    Resource, SignerInput, StakeType, TransactionChange, TransactionFee, TransactionInputType, TransactionLoadInput, TransactionLoadMetadata, TransactionMetadata,
+    AccountDataType, Asset, Chain, EarnType, FeeOption, GasPriceType, HyperliquidOrder, PerpetualConfirmData, PerpetualDirection, PerpetualMarginType, PerpetualProvider,
+    PerpetualType, Resource, SignerInput, StakeType, TransactionChange, TransactionFee, TransactionInputType, TransactionLoadInput, TransactionLoadMetadata, TransactionMetadata,
     TransactionPerpetualMetadata, TransactionState, TransactionStateRequest, TransactionSwapMetadata, TransactionType, TransactionUpdate, TransferDataExtra,
     TransferDataOutputAction, TransferDataOutputType, TronStakeData, TronUnfreeze, TronVote, UInt64, WalletConnectionSessionAppMetadata,
     perpetual::{CancelOrderData, PerpetualModifyConfirmData, PerpetualModifyPositionType, PerpetualReduceData, TPSLOrderData},
@@ -146,9 +147,16 @@ pub enum GemAccountDataType {
 pub struct GemTransactionStateRequest {
     pub id: String,
     pub sender_address: String,
-    pub created_at: i64,
-    pub block_number: i64,
-    pub swap_provider: Option<SwapperProvider>,
+    pub created_at: DateTime<Utc>,
+    pub block_number: UInt64,
+}
+
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct GemTransactionSwapStateRequest {
+    pub transaction: GemTransactionStateRequest,
+    pub state: TransactionState,
+    pub swap_provider: SwapperProvider,
+    pub destination_chain: Chain,
 }
 
 pub type GemHyperliquidOrder = HyperliquidOrder;

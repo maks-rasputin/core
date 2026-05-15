@@ -20,7 +20,7 @@ impl<C: Client> HyperCoreClient<C> {
 
         match id {
             HyperCoreTransactionId::Order(oid) => {
-                let start_time = request.created_at - 5_000;
+                let start_time = request.created_at.timestamp_millis() - 5_000;
                 let fills = self.get_user_fills_by_time(&request.sender_address, start_time).await?;
                 Ok(transaction_state_mapper::map_transaction_state_order(fills, oid, request.id))
             }

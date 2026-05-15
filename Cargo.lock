@@ -6934,6 +6934,7 @@ name = "settings_chain"
 version = "1.0.0"
 dependencies = [
  "chain_traits",
+ "chrono",
  "gem_algorand",
  "gem_aptos",
  "gem_bitcoin",

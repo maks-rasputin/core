@@ -14,7 +14,7 @@ rpc = [
 tvm = ["dep:gem_hash"]
 signer = ["tvm", "dep:signer"]
 reqwest = ["gem_client/reqwest"]
-chain_integration_tests = ["rpc", "reqwest", "settings/testkit"]
+chain_integration_tests = ["rpc", "reqwest", "primitives/testkit", "settings/testkit"]
 
 [dependencies]
 hex = { workspace = true }

@@ -2,7 +2,7 @@ use primitives::{TransactionChange, TransactionState, TransactionUpdate};
 
 use crate::models::rpc::Block;
 
-pub fn map_transaction_status(blocks: Vec<Block>, transaction_id: &str, block_number: i64) -> TransactionUpdate {
+pub fn map_transaction_status(blocks: Vec<Block>, transaction_id: &str, block_number: u64) -> TransactionUpdate {
     for block in blocks {
         for extrinsic in block.extrinsics {
             if extrinsic.hash == transaction_id {

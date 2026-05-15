@@ -28,7 +28,7 @@ mod chain_integration_tests {
     #[tokio::test]
     async fn test_ethereum_get_transaction_status_confirmed() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let client = create_ethereum_test_client();
-        let request = TransactionStateRequest::new_id("0x98dd4d9a586620f84e8066f1b015d663f9c0c94c4e0e02377840c3e6d43e2ad3".to_string());
+        let request = TransactionStateRequest::mock_with_id("0x98dd4d9a586620f84e8066f1b015d663f9c0c94c4e0e02377840c3e6d43e2ad3");
 
         let result = client.get_transaction_status(request).await?;
 
@@ -47,7 +47,7 @@ mod chain_integration_tests {
     #[tokio::test]
     async fn test_smartchain_get_transaction_status_confirmed() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let client = create_smartchain_test_client();
-        let request = TransactionStateRequest::new_id("0xd85c4496230adf8a7c0fc1e98713127fb31a0f8f72874acea443e2f615f3c1b6".to_string());
+        let request = TransactionStateRequest::mock_with_id("0xd85c4496230adf8a7c0fc1e98713127fb31a0f8f72874acea443e2f615f3c1b6");
 
         let result = client.get_transaction_status(request).await?;
 

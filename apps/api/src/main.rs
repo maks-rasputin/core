@@ -121,6 +121,7 @@ fn mount_routes(rocket: Rocket<Build>, admin_enabled: bool) -> Rocket<Build> {
                 devices::get_device_assets_v2,
                 devices::get_device_wallet_configuration_v2,
                 devices::get_device_name_resolve_v2,
+                devices::get_device_transaction_v2,
                 devices::get_device_transaction_by_id_v2,
                 devices::get_device_transactions_v2,
                 devices::get_device_address_names_v2,

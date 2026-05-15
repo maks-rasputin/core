@@ -1,6 +1,7 @@
 use std::error::Error;
 
 use chain_traits::{ChainTraits, TransactionsRequest};
+use chrono::{DateTime, Utc};
 use primitives::{AddressStatus, Asset, AssetBalance, Chain, DelegationBase, PerpetualPositionsSummary, StakeValidator, Transaction, TransactionStateRequest, TransactionUpdate};
 use settings::Settings;
 
@@ -80,7 +81,14 @@ impl ChainProviders {
     }
 
     pub async fn get_transaction_status(&self, chain: Chain, hash: String) -> Result<TransactionUpdate, Box<dyn Error + Send + Sync>> {
-        self.get_provider(chain)?.get_transaction_status(TransactionStateRequest::new_id(hash)).await
+        self.get_provider(chain)?
+            .get_transaction_status(TransactionStateRequest {
+                id: hash,
+                sender_address: String::new(),
+                created_at: DateTime::<Utc>::UNIX_EPOCH,
+                block_number: 0,
+            })
+            .await
     }
 
     pub async fn get_block_transactions(&self, chain: Chain, block_number: u64) -> Result<Vec<Transaction>, Box<dyn Error + Send + Sync>> {

@@ -47,7 +47,7 @@ mod chain_integration_tests {
         let latest_block = client.get_block_latest_number().await?;
         let transactions = client.get_transactions_by_block(latest_block - 1).await?;
         let transaction_id = transactions.transactions.first().ok_or("No Sui transaction found in latest checkpoint")?;
-        let request = TransactionStateRequest::new_id(transaction_id.to_string());
+        let request = TransactionStateRequest::mock_with_id(transaction_id);
         let status = client.get_transaction_status(request).await?;
 
         println!("Transaction status: {:?}", status);

@@ -13,7 +13,7 @@ rpc = [
 ]
 reqwest = ["rpc", "gem_jsonrpc/reqwest"]
 signer = ["dep:signer"]
-chain_integration_tests = ["rpc", "reqwest", "settings/testkit"]
+chain_integration_tests = ["rpc", "reqwest", "primitives/testkit", "settings/testkit"]
 
 [dependencies]
 primitives = { path = "../primitives" }

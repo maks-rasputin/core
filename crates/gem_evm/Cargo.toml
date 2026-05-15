@@ -8,7 +8,7 @@ default = []
 rpc = ["dep:async-trait", "dep:chain_traits"]
 reqwest = ["gem_jsonrpc/reqwest", "gem_client/reqwest", "dep:reqwest"]
 signer = ["dep:alloy-signer-local", "dep:alloy-network", "dep:alloy-consensus"]
-chain_integration_tests = ["rpc", "reqwest", "settings/testkit"]
+chain_integration_tests = ["rpc", "reqwest", "primitives/testkit", "settings/testkit"]
 testkit = []
 
 [dependencies]

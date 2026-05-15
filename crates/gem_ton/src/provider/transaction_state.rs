@@ -36,7 +36,7 @@ mod chain_integration_tests {
     #[tokio::test]
     async fn test_ton_transaction_status_confirmed() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let client = create_ton_test_client();
-        let request = TransactionStateRequest::new_id("w7Tz84LDLoQ3HPCuU0DZbj2sCq-eZKH1vse_wm67kxA=".to_string());
+        let request = TransactionStateRequest::mock_with_id("w7Tz84LDLoQ3HPCuU0DZbj2sCq-eZKH1vse_wm67kxA=");
         let update = client.get_transaction_status(request).await?;
 
         assert_eq!(update.state, TransactionState::Confirmed);
@@ -49,7 +49,7 @@ mod chain_integration_tests {
     #[tokio::test]
     async fn test_ton_transaction_status_reverted() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let client = create_ton_test_client();
-        let request = TransactionStateRequest::new_id("0676f9e79a1e56c52394be74ffc75c6b2268aa0be094307ee651c23fff775952".to_string());
+        let request = TransactionStateRequest::mock_with_id("0676f9e79a1e56c52394be74ffc75c6b2268aa0be094307ee651c23fff775952");
         let update = client.get_transaction_status(request).await?;
 
         assert_eq!(update.state, TransactionState::Reverted);

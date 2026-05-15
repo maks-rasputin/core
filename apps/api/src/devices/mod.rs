@@ -86,6 +86,19 @@ pub async fn get_device_transaction_by_id_v2(
     id: TransactionIdParam,
     client: &State<Mutex<TransactionsClient>>,
 ) -> Result<ApiResponse<Transaction>, ApiError> {
+    get_device_transaction(id, client).await
+}
+
+#[get("/devices/transaction/<id>")]
+pub async fn get_device_transaction_v2(
+    _device: AuthenticatedDevice,
+    id: TransactionIdParam,
+    client: &State<Mutex<TransactionsClient>>,
+) -> Result<ApiResponse<Transaction>, ApiError> {
+    get_device_transaction(id, client).await
+}
+
+async fn get_device_transaction(id: TransactionIdParam, client: &State<Mutex<TransactionsClient>>) -> Result<ApiResponse<Transaction>, ApiError> {
     Ok(client.lock().await.get_transaction_by_id(&id.0)?.into())
 }
 

@@ -32,27 +32,3 @@ pub enum TransactionMetadata {
     Perpetual(TransactionPerpetualMetadata),
     Swap(TransactionSwapMetadata),
 }
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct TransactionStateRequest {
-    pub id: String,
-    pub sender_address: String,
-    pub created_at: i64,
-    pub block_number: i64,
-}
-
-impl TransactionStateRequest {
-    pub fn new_id(id: String) -> Self {
-        Self {
-            id,
-            sender_address: String::new(),
-            created_at: 0,
-            block_number: 0,
-        }
-    }
-
-    pub fn with_block_number(mut self, block_number: i64) -> Self {
-        self.block_number = block_number;
-        self
-    }
-}
