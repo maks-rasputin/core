@@ -45,7 +45,12 @@ impl MessageConsumer<TransactionsPayload, usize> for StoreTransactionsConsumer {
 
         let min_amount = self.config.min_amount_usd;
 
-        let addresses: Vec<_> = transactions.iter().flat_map(|tx| tx.addresses()).collect::<HashSet<_>>().into_iter().collect();
+        let addresses: Vec<_> = transactions
+            .iter()
+            .flat_map(|transaction| transaction.addresses())
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect();
         let subscriptions = self.database.wallets()?.get_subscriptions_by_chain_addresses(chain, addresses)?;
         let notification_subscriptions = Self::unique_subscriptions_per_device(subscriptions.clone());
 
