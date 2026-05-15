@@ -3,11 +3,12 @@ use crate::{SwapperProvider, SwapperQuoteAsset, SwapperSlippage, config::DEFAULT
 pub use primitives::swap::SwapResult;
 use primitives::{
     AssetId, Chain,
-    swap::{ApprovalData, SwapProviderData, SwapProviderMode, SwapQuote},
+    swap::{ApprovalData, SwapProviderMode},
 };
+use serde::Serialize;
 use std::fmt::Debug;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ProviderType {
     pub id: SwapperProvider,
     pub name: String,
@@ -51,13 +52,14 @@ impl ProviderType {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct QuoteRequest {
     pub from_asset: SwapperQuoteAsset,
     pub to_asset: SwapperQuoteAsset,
     pub wallet_address: String,
     pub destination_address: String,
     pub value: String,
+    #[serde(skip_serializing)]
     pub options: Options,
 }
 
@@ -84,33 +86,13 @@ impl Default for Options {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Quote {
     pub from_value: String,
     pub to_value: String,
     pub data: ProviderData,
     pub request: QuoteRequest,
     pub eta_in_seconds: Option<u32>,
-}
-
-impl Quote {
-    pub fn as_primitive(self) -> SwapQuote {
-        let provider = self.data.provider;
-        SwapQuote {
-            from_address: self.request.wallet_address,
-            from_value: self.from_value,
-            to_address: self.request.destination_address,
-            to_value: self.to_value,
-            provider_data: SwapProviderData {
-                provider: provider.id,
-                name: provider.name,
-                protocol_name: provider.protocol,
-            },
-            slippage_bps: self.data.slippage_bps,
-            eta_in_seconds: self.eta_in_seconds,
-            use_max_amount: Some(self.request.options.use_max_amount),
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -144,14 +126,14 @@ pub struct Permit2ApprovalData {
     pub permit2_nonce: u64,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ProviderData {
     pub provider: ProviderType,
     pub slippage_bps: u32,
     pub routes: Vec<Route>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Route {
     pub input: AssetId,
     pub output: AssetId,
