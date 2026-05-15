@@ -1,5 +1,6 @@
 mod alien;
 mod approval;
+mod cache;
 mod chainlink;
 pub mod cross_chain;
 mod eth_address;
@@ -33,6 +34,8 @@ pub mod thorchain;
 pub mod uniswap;
 
 use number_formatter::BigNumberFormatter;
+
+pub(crate) use cache::{STATIC_READ_CACHE_TTL_SECONDS, static_read_cache_headers};
 
 /// Converts a human-readable amount string to base units value.
 pub fn amount_to_value(token: &str, decimals: u32) -> Option<String> {

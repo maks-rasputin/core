@@ -1,5 +1,5 @@
 use super::{constants::RouterInfo, quote::PoolData};
-use crate::{Quote, SwapperError, route_cache::ValueCache};
+use crate::{Quote, SwapperError, route_cache::ValueCache, static_read_cache_headers};
 use gem_client::Client;
 use gem_ton::{
     address::Address,
@@ -10,7 +10,11 @@ use gem_ton::{
 use num_bigint::BigUint;
 use num_traits::{Num, ToPrimitive};
 use primitives::Address as PrimitiveAddress;
-use std::{fmt::Debug, str::FromStr};
+use std::{collections::HashMap, fmt::Debug, str::FromStr};
+
+const GET_WALLET_ADDRESS_METHOD: &str = "get_wallet_address";
+const GET_POOL_ADDRESS_METHOD: &str = "get_pool_address";
+const GET_POOL_DATA_METHOD: &str = "get_pool_data";
 
 #[derive(Debug)]
 pub(super) struct StonfiClient<C>
@@ -43,9 +47,9 @@ where
         let token0 = Address::parse(wallet0)?;
         let token1 = Address::parse(wallet1)?;
         let result = self
-            .run_get_method(
+            .run_static_get_method(
                 router.address,
-                "get_pool_address",
+                GET_POOL_ADDRESS_METHOD,
                 vec![StackArg::slice(token0.to_boc_base64()?), StackArg::slice(token1.to_boc_base64()?)],
             )
             .await?;
@@ -53,7 +57,7 @@ where
     }
 
     pub(super) async fn get_pool_data(&self, pool_address: &str) -> Result<PoolData, SwapperError> {
-        let result = self.run_get_method(pool_address, "get_pool_data", Vec::new()).await?;
+        let result = self.run_get_method(pool_address, GET_POOL_DATA_METHOD, Vec::new()).await?;
         parse_pool_data(&result)
     }
 
@@ -72,7 +76,7 @@ where
         }
         let owner_address = Address::parse(owner)?;
         let result = self
-            .run_get_method(token, "get_wallet_address", vec![StackArg::slice(owner_address.to_boc_base64()?)])
+            .run_static_get_method(token, GET_WALLET_ADDRESS_METHOD, vec![StackArg::slice(owner_address.to_boc_base64()?)])
             .await?;
         let wallet = stack_cell_address(&result.stack, 0)?;
         self.jetton_wallet_cache.put(key, wallet.clone());
@@ -80,9 +84,17 @@ where
     }
 
     async fn run_get_method(&self, address: &str, method: &str, stack: Vec<StackArg>) -> Result<RunGetMethodResult, SwapperError> {
+        self.run_get_method_with_headers(address, method, stack, HashMap::new()).await
+    }
+
+    async fn run_static_get_method(&self, address: &str, method: &str, stack: Vec<StackArg>) -> Result<RunGetMethodResult, SwapperError> {
+        self.run_get_method_with_headers(address, method, stack, static_read_cache_headers()).await
+    }
+
+    async fn run_get_method_with_headers(&self, address: &str, method: &str, stack: Vec<StackArg>, headers: HashMap<String, String>) -> Result<RunGetMethodResult, SwapperError> {
         let result = self
             .ton_client
-            .run_get_method(address, method, stack)
+            .run_get_method_with_headers(address, method, stack, headers)
             .await
             .map_err(|err| SwapperError::ComputeQuoteError(err.to_string()))?;
         if result.exit_code != 0 {

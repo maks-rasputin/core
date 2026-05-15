@@ -49,7 +49,7 @@ extension NativeProvider: AlienProvider {
 
         print("<== response size: \(data.count)")
 
-        if let ttl = target.headers?["x-cache-ttl"] {
+        if let ttl = target.headers?["x-gem-cache-ttl"] {
             await self.cache.set(value: data, forKey: target, ttl: TimeInterval(ttl))
         }
 

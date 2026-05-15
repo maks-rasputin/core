@@ -10,7 +10,7 @@ use std::{
     sync::Arc,
 };
 
-pub const X_CACHE_TTL: &str = "x-cache-ttl";
+pub const X_CACHE_TTL: &str = "x-gem-cache-ttl";
 
 pub type RpcResponse = Response;
 

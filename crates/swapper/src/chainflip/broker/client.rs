@@ -2,7 +2,7 @@ use super::{
     ChainflipEnvironment, ChainflipIngressEgress, VaultSwapExtras, VaultSwapResponse,
     model::{ChainflipAsset, DcaParameters, DepositAddressResponse, RefundParameters},
 };
-use crate::SwapperError;
+use crate::{STATIC_READ_CACHE_TTL_SECONDS, SwapperError};
 use gem_client::Client;
 use gem_jsonrpc::client::JsonRpcClient;
 use serde_json::{Value, json};
@@ -27,7 +27,7 @@ where
     pub async fn get_swap_limits(&self) -> Result<ChainflipIngressEgress, SwapperError> {
         let result = self
             .client
-            .call_method_with_param("cf_environment", json!([]), Some(60 * 60 * 24 * 30))
+            .call_method_with_param("cf_environment", json!([]), Some(STATIC_READ_CACHE_TTL_SECONDS))
             .await
             .map_err(SwapperError::from)?;
 

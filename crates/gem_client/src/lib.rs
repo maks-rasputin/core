@@ -33,7 +33,7 @@ use serde::{Serialize, de::DeserializeOwned};
 use std::{collections::HashMap, fmt::Debug};
 
 pub type Data = Vec<u8>;
-pub const X_CACHE_TTL: &str = "x-cache-ttl";
+pub const X_CACHE_TTL: &str = "x-gem-cache-ttl";
 
 #[async_trait]
 pub trait Client: Send + Sync + Debug {
