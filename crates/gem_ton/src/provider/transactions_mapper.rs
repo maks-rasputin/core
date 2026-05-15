@@ -76,9 +76,9 @@ fn map_root_trace_transaction(trace: Trace) -> Option<Transaction> {
 
     let details = jetton_swap_details(&trace.actions)
         .or_else(|| jetton_transfer_details(&trace.actions))
-        .or_else(|| simple_transfer_details(&root))?;
+        .or_else(|| simple_transfer_details(root))?;
 
-    build_transaction(&root, state, details)
+    build_transaction(root, state, details)
 }
 
 fn build_transaction(message: &TransactionMessage, state: Option<TransactionState>, details: TransferDetails) -> Option<Transaction> {

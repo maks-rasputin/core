@@ -32,11 +32,9 @@ pub fn build_swap_transaction(params: SwapTransactionParams<'_>) -> Result<TxPar
 fn build_ton_to_jetton(params: SwapTransactionParams<'_>, swap_body: &CellArc) -> Result<TxParams, SwapperError> {
     let from_value = BigUint::from_str(params.from_value)?;
     let body = build_pton_ton_transfer_body(&from_value, &params.wallet_address, Some(swap_body))?;
+    let forward_gas = V2_TON_TO_JETTON_FORWARD_GAS + next_swap_forward_gas(&params) + PTON_V2_TON_TRANSFER_GAS;
 
-    let mut value = from_value;
-    value += BigUint::from(V2_TON_TO_JETTON_FORWARD_GAS);
-    value += BigUint::from(next_swap_forward_gas(&params));
-    value += BigUint::from(PTON_V2_TON_TRANSFER_GAS);
+    let value = from_value + BigUint::from(forward_gas);
 
     Ok(TxParams {
         to: params.simulation.offer_jetton_wallet.clone(),
@@ -71,7 +69,7 @@ fn build_swap_body(params: &SwapTransactionParams<'_>) -> Result<Cell, SwapperEr
     let ask_wallet = Address::parse(&params.simulation.ask_jetton_wallet)?;
     let receiver_address = match params.next_swap.as_ref() {
         Some(next_swap) if params.simulation.router == next_swap.simulation.router => Address::parse(&params.simulation.router.address)?,
-        Some(next_swap) => Address::parse(&next_swap.simulation.router.address)?,
+        Some(next_swap) => Address::parse(&next_swap.simulation.offer_jetton_wallet)?,
         None => params.receiver_address,
     };
     let min_ask_amount = BigUint::from_str(&params.simulation.min_ask_units)?;
@@ -175,7 +173,7 @@ fn build_pton_ton_transfer_body(amount: &BigUint, refund_address: &Address, forw
 mod tests {
     use super::*;
     use crate::stonfi::{
-        model::SwapSimulation,
+        model::{Router, SwapSimulation},
         tx_builder::{NextSwapParams, SwapTransactionParams},
     };
 
@@ -249,8 +247,7 @@ mod tests {
         );
         assert!(BagOfCells::parse_base64(&cross_transaction.data).is_ok());
 
-        let mut swap_from_intermediary_on_other_router = swap_from_intermediary.clone();
-        swap_from_intermediary_on_other_router.router.address = "EQDx--jUU9PUtHltPYZX7wdzIi0SPY3KZ8nvOs0iZvQJd6Ql".to_string();
+        let swap_from_intermediary_on_other_router = simulation_with_router(&swap_from_intermediary, "EQDx--jUU9PUtHltPYZX7wdzIi0SPY3KZ8nvOs0iZvQJd6Ql");
         let forward_transaction = build_swap_transaction(SwapTransactionParams {
             next_swap: Some(NextSwapParams {
                 simulation: &swap_from_intermediary_on_other_router,
@@ -267,8 +264,18 @@ mod tests {
         assert_eq!(forward_transaction.value, "540000000");
         assert_eq!(
             forward_transaction.data,
-            "te6cckECBQEAAd4AAa4Pin6lAAAAAAAAAAAw9CQIASXCgjXKjRJeZ2WRUT1SByGx/pn3ci9Mh3I85+4N+3OjAAzoUpalAaXnVm5MoiYWRZguLFzY0KxFjLv3MkRq5BXzyDk4cAEBAeFmZN4qgBJFrE+vsdt6AcnEd7YYqU7dy8PoyudDXogvCv9HxH0j8ADOhSlqUBpedWbkyiJhZFmC4sXNjQrEWMu/cyRGrkFfPgAZ0KUtSgNLzqzcmURMLIswXFi5saFYixl37mSI1cgr54AAAAAyqfiAQAIBmzA+5jgB4/fRqKenqWjy2nsMr94O5kRaJHsblM+T3nWaRM3oEu6BycOAEAAAQAM6FKWpQGl51ZuTKImFkWYLixc2NCsRYy79zJEauQV8+AMB4WZk3iqAEkQYMDTZ/VmiNvcexCcb43c5kFbdpMw6Xr9dxAln32QQAM6FKWpQGl51ZuTKImFkWYLixc2NCsRYy79zJEauQV8+ABnQpS1KA0vOrNyZREwsizBcWLmxoViLGXfuZIjVyCvngAAAADKp+IBABACRICtoAGdClLUoDS86s3JlETCyLMFxYubGhWIsZd+5kiNXIK+eAAAZQAM6FKWpQGl51ZuTKImFkWYLixc2NCsRYy79zJEauQV8+J6Wy8o="
+            "te6cckECBQEAAd4AAa4Pin6lAAAAAAAAAAAw9CQIASXCgjXKjRJeZ2WRUT1SByGx/pn3ci9Mh3I85+4N+3OjAAzoUpalAaXnVm5MoiYWRZguLFzY0KxFjLv3MkRq5BXzyDk4cAEBAeFmZN4qgBJFrE+vsdt6AcnEd7YYqU7dy8PoyudDXogvCv9HxH0j8ADOhSlqUBpedWbkyiJhZFmC4sXNjQrEWMu/cyRGrkFfPgAZ0KUtSgNLzqzcmURMLIswXFi5saFYixl37mSI1cgr54AAAAAyqfiAQAIBmzA+5jgBJFrE+vsdt6AcnEd7YYqU7dy8PoyudDXogvCv9HxH0j6BycOAEAAAQAM6FKWpQGl51ZuTKImFkWYLixc2NCsRYy79zJEauQV8+AMB4WZk3iqAEkQYMDTZ/VmiNvcexCcb43c5kFbdpMw6Xr9dxAln32QQAM6FKWpQGl51ZuTKImFkWYLixc2NCsRYy79zJEauQV8+ABnQpS1KA0vOrNyZREwsizBcWLmxoViLGXfuZIjVyCvngAAAADKp+IBABACRICtoAGdClLUoDS86s3JlETCyLMFxYubGhWIsZd+5kiNXIK+eAAAZQAM6FKWpQGl51ZuTKImFkWYLixc2NCsRYy79zJEauQV8+Jp8zgc="
         );
         assert!(BagOfCells::parse_base64(&forward_transaction.data).is_ok());
+    }
+
+    fn simulation_with_router(simulation: &SwapSimulation, router_address: &str) -> SwapSimulation {
+        SwapSimulation {
+            router: Router {
+                address: router_address.to_string(),
+                ..simulation.router.clone()
+            },
+            ..simulation.clone()
+        }
     }
 }
