@@ -68,7 +68,7 @@ fn build_jetton_swap(params: SwapTransactionParams<'_>, swap_body: &CellArc) -> 
 fn build_swap_body(params: &SwapTransactionParams<'_>) -> Result<Cell, SwapperError> {
     let ask_wallet = Address::parse(&params.simulation.ask_jetton_wallet)?;
     let receiver_address = match params.next_swap.as_ref() {
-        Some(next_swap) if params.simulation.router == next_swap.simulation.router => Address::parse(&params.simulation.router.address)?,
+        Some(next_swap) if is_same_router(params, next_swap) => Address::parse(&params.simulation.router.address)?,
         Some(next_swap) => Address::parse(&next_swap.simulation.offer_jetton_wallet)?,
         None => params.receiver_address,
     };
@@ -104,11 +104,7 @@ fn build_swap_body(params: &SwapTransactionParams<'_>) -> Result<Cell, SwapperEr
 }
 
 fn build_next_swap_body(params: &SwapTransactionParams<'_>, next_swap: &NextSwapParams<'_>) -> Result<Cell, SwapperError> {
-    let opcode = if params.simulation.router == next_swap.simulation.router {
-        V2_CROSS_SWAP_OPCODE
-    } else {
-        V2_SWAP_OPCODE
-    };
+    let opcode = if is_same_router(params, next_swap) { V2_CROSS_SWAP_OPCODE } else { V2_SWAP_OPCODE };
     let ask_wallet = Address::parse(&next_swap.simulation.ask_jetton_wallet)?;
     let deadline = params.deadline.unwrap_or_else(|| unix_timestamp() + V2_DEFAULT_DEADLINE_SECONDS);
 
@@ -153,9 +149,13 @@ fn build_swap_cell(params: SwapCellParams<'_>) -> Result<Cell, SwapperError> {
 fn next_swap_forward_gas(params: &SwapTransactionParams<'_>) -> u64 {
     // Same-router cross-swaps route internally; inter-router hops need extra forward gas.
     match params.next_swap.as_ref() {
-        Some(next_swap) if params.simulation.router != next_swap.simulation.router => V2_JETTON_SWAP_FORWARD_GAS,
+        Some(next_swap) if !is_same_router(params, next_swap) => V2_JETTON_SWAP_FORWARD_GAS,
         _ => 0,
     }
+}
+
+fn is_same_router(params: &SwapTransactionParams<'_>, next_swap: &NextSwapParams<'_>) -> bool {
+    params.simulation.router.address == next_swap.simulation.router.address
 }
 
 fn build_pton_ton_transfer_body(amount: &BigUint, refund_address: &Address, forward_payload: Option<&CellArc>) -> Result<Cell, SwapperError> {
@@ -247,7 +247,32 @@ mod tests {
         );
         assert!(BagOfCells::parse_base64(&cross_transaction.data).is_ok());
 
-        let swap_from_intermediary_on_other_router = simulation_with_router(&swap_from_intermediary, "EQDx--jUU9PUtHltPYZX7wdzIi0SPY3KZ8nvOs0iZvQJd6Ql");
+        let swap_from_intermediary_with_minor_mismatch = simulation_with_router(
+            &swap_from_intermediary,
+            Router {
+                minor_version: 1,
+                ..swap_from_intermediary.router.clone()
+            },
+        );
+        let cross_transaction_with_minor_mismatch = build_swap_transaction(SwapTransactionParams {
+            next_swap: Some(NextSwapParams {
+                simulation: &swap_from_intermediary_with_minor_mismatch,
+                min_ask_amount: BigUint::from(694u32),
+            }),
+            ..SwapTransactionParams::mock(&swap_to_intermediary)
+        })
+        .unwrap();
+
+        assert_eq!(cross_transaction_with_minor_mismatch.value, cross_transaction.value);
+        assert_eq!(cross_transaction_with_minor_mismatch.data, cross_transaction.data);
+
+        let swap_from_intermediary_on_other_router = simulation_with_router(
+            &swap_from_intermediary,
+            Router {
+                address: "EQDx--jUU9PUtHltPYZX7wdzIi0SPY3KZ8nvOs0iZvQJd6Ql".to_string(),
+                ..swap_from_intermediary.router.clone()
+            },
+        );
         let forward_transaction = build_swap_transaction(SwapTransactionParams {
             next_swap: Some(NextSwapParams {
                 simulation: &swap_from_intermediary_on_other_router,
@@ -269,13 +294,7 @@ mod tests {
         assert!(BagOfCells::parse_base64(&forward_transaction.data).is_ok());
     }
 
-    fn simulation_with_router(simulation: &SwapSimulation, router_address: &str) -> SwapSimulation {
-        SwapSimulation {
-            router: Router {
-                address: router_address.to_string(),
-                ..simulation.router.clone()
-            },
-            ..simulation.clone()
-        }
+    fn simulation_with_router(simulation: &SwapSimulation, router: Router) -> SwapSimulation {
+        SwapSimulation { router, ..simulation.clone() }
     }
 }
