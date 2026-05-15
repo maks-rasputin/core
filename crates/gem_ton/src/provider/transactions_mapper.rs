@@ -71,17 +71,12 @@ struct TransferDetails {
 
 fn map_root_trace_transaction(trace: Trace) -> Option<Transaction> {
     let state = if trace.is_incomplete || trace.has_actions() { Some(trace.action_state()) } else { None };
-    let mut transactions = trace.transactions;
-    let root_hash = trace.transactions_order.into_iter().next()?;
-    let root = transactions.remove(&root_hash)?;
+    let root_hash = trace.transactions_order.first()?;
+    let root = trace.transactions.get(root_hash)?;
 
-    let details = if let Some(d) = jetton_transfer_details(&trace.actions) {
-        d
-    } else {
-        let mut d = simple_transfer_details(&root)?;
-        apply_jetton_swap(&mut d, &trace.actions);
-        d
-    };
+    let details = jetton_swap_details(&trace.actions)
+        .or_else(|| jetton_transfer_details(&trace.actions))
+        .or_else(|| simple_transfer_details(&root))?;
 
     build_transaction(&root, state, details)
 }
@@ -129,18 +124,29 @@ fn jetton_transfer_details(actions: &[TraceAction]) -> Option<TransferDetails> {
     })
 }
 
-fn apply_jetton_swap(details: &mut TransferDetails, actions: &[TraceAction]) {
-    let Some(action) = find_action(actions, TRACE_ACTION_JETTON_SWAP) else {
-        return;
-    };
-    let Some(swap): Option<JettonSwapDetails> = action.details.clone().and_then(|value| serde_json::from_value(value).ok()) else {
-        return;
-    };
-    let Some(sender) = parse_address(&swap.sender) else {
-        return;
-    };
+fn jetton_swap_details(actions: &[TraceAction]) -> Option<TransferDetails> {
+    let (sender, metadata) = jetton_swap_metadata(actions)?;
+    let asset_id = metadata.from_asset.clone();
+    let value = metadata.from_value.clone();
+    let metadata_value = serde_json::to_value(metadata).ok()?;
+
+    Some(TransferDetails {
+        asset_id,
+        from: sender.clone(),
+        to: sender,
+        value,
+        transaction_type: TransactionType::Swap,
+        memo: None,
+        metadata: Some(metadata_value),
+    })
+}
+
+fn jetton_swap_metadata(actions: &[TraceAction]) -> Option<(String, TransactionSwapMetadata)> {
+    let action = find_action(actions, TRACE_ACTION_JETTON_SWAP)?;
+    let swap: JettonSwapDetails = action.details.clone().and_then(|value| serde_json::from_value(value).ok())?;
+    let sender = parse_address(&swap.sender)?;
     let (Some(from_asset), Some(to_asset)) = (ton_asset_id(swap.asset_in.as_deref()), ton_asset_id(swap.asset_out.as_deref())) else {
-        return;
+        return None;
     };
     let metadata = TransactionSwapMetadata {
         from_asset,
@@ -149,13 +155,7 @@ fn apply_jetton_swap(details: &mut TransferDetails, actions: &[TraceAction]) {
         to_value: swap.dex_outgoing_transfer.amount,
         provider: swap.dex,
     };
-    let Ok(metadata) = serde_json::to_value(metadata) else {
-        return;
-    };
-    details.transaction_type = TransactionType::Swap;
-    details.from = sender.clone();
-    details.to = sender;
-    details.metadata = Some(metadata);
+    Some((sender, metadata))
 }
 
 fn ton_asset_id(raw_address: Option<&str>) -> Option<AssetId> {
@@ -356,6 +356,30 @@ mod tests {
         assert_eq!(swap.to_asset.chain, Chain::Ton);
         assert!(swap.to_asset.token_id.is_some());
         assert_eq!(swap.to_value, "2436222");
+        assert_eq!(swap.provider.as_deref(), Some("stonfi_v2"));
+    }
+
+    #[test]
+    fn test_map_trace_transactions_jetton_swap_from_jetton_transfer() {
+        let traces = TraceResponse::mock_jetton_swap_from_jetton_transfer();
+        let transactions = map_trace_transactions(traces.traces);
+
+        assert_eq!(transactions.len(), 1);
+        let transaction = &transactions[0];
+        assert_eq!(transaction.transaction_type, TransactionType::Swap);
+        assert_eq!(transaction.state, TransactionState::Confirmed);
+        assert_eq!(transaction.from, "UQAzoUpalAaXnVm5MoiYWRZguLFzY0KxFjLv3MkRq5BXz3VV");
+        assert_eq!(transaction.from, transaction.to);
+        assert_eq!(transaction.asset_id.chain, Chain::Ton);
+        assert_eq!(transaction.asset_id.token_id.as_deref(), Some("EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"));
+        assert_eq!(transaction.value, "1000000");
+
+        let metadata = transaction.metadata.as_ref().unwrap();
+        let swap: TransactionSwapMetadata = serde_json::from_value(metadata.clone()).unwrap();
+        assert_eq!(swap.from_asset, AssetId::from_token(Chain::Ton, "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"));
+        assert_eq!(swap.from_value, "1000000");
+        assert_eq!(swap.to_asset, AssetId::from_chain(Chain::Ton));
+        assert_eq!(swap.to_value, "476299454");
         assert_eq!(swap.provider.as_deref(), Some("stonfi_v2"));
     }
 

@@ -58,6 +58,10 @@ impl TraceResponse {
         serde_json::from_str(include_str!("../../testdata/jetton_swap_trace.json")).unwrap()
     }
 
+    pub fn mock_jetton_swap_from_jetton_transfer() -> Self {
+        serde_json::from_str(include_str!("../../testdata/jetton_swap_from_jetton_transfer_trace.json")).unwrap()
+    }
+
     pub fn mock_jetton_transfer() -> Self {
         serde_json::from_str(include_str!("../../testdata/jetton_transfer_trace.json")).unwrap()
     }
