@@ -10,7 +10,7 @@ use gem_ton::{
 use num_bigint::BigUint;
 use num_traits::{Num, ToPrimitive};
 use primitives::Address as PrimitiveAddress;
-use std::{collections::HashMap, fmt::Debug, str::FromStr};
+use std::{fmt::Debug, str::FromStr};
 
 const GET_WALLET_ADDRESS_METHOD: &str = "get_wallet_address";
 const GET_POOL_ADDRESS_METHOD: &str = "get_pool_address";
@@ -84,17 +84,21 @@ where
     }
 
     async fn run_get_method(&self, address: &str, method: &str, stack: Vec<StackArg>) -> Result<RunGetMethodResult, SwapperError> {
-        self.run_get_method_with_headers(address, method, stack, HashMap::new()).await
+        let result = self
+            .ton_client
+            .run_get_method(address, method, stack)
+            .await
+            .map_err(|err| SwapperError::ComputeQuoteError(err.to_string()))?;
+        if result.exit_code != 0 {
+            return Err(SwapperError::ComputeQuoteError(format!("TON get-method {method} exit code {}", result.exit_code)));
+        }
+        Ok(result)
     }
 
     async fn run_static_get_method(&self, address: &str, method: &str, stack: Vec<StackArg>) -> Result<RunGetMethodResult, SwapperError> {
-        self.run_get_method_with_headers(address, method, stack, static_read_cache_headers()).await
-    }
-
-    async fn run_get_method_with_headers(&self, address: &str, method: &str, stack: Vec<StackArg>, headers: HashMap<String, String>) -> Result<RunGetMethodResult, SwapperError> {
         let result = self
             .ton_client
-            .run_get_method_with_headers(address, method, stack, headers)
+            .run_get_method_with_headers(address, method, stack, static_read_cache_headers())
             .await
             .map_err(|err| SwapperError::ComputeQuoteError(err.to_string()))?;
         if result.exit_code != 0 {

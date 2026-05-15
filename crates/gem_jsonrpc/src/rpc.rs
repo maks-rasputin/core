@@ -10,8 +10,6 @@ use std::{
     sync::Arc,
 };
 
-pub const X_CACHE_TTL: &str = "x-gem-cache-ttl";
-
 pub type RpcResponse = Response;
 
 pub trait RpcClientError: Error + Send + Sync + 'static + Display + Sized {
@@ -52,7 +50,7 @@ impl Target {
             self.headers = Some(HashMap::new());
         }
         if let Some(headers) = self.headers.as_mut() {
-            headers.insert(X_CACHE_TTL.into(), ttl.to_string());
+            headers.insert(gem_client::X_CACHE_TTL.into(), ttl.to_string());
         }
         self
     }

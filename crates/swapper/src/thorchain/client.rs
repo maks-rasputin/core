@@ -2,10 +2,13 @@ use super::{
     asset::THORChainAsset,
     model::{AsgardVault, InboundAddress, QuoteSwapRequest, QuoteSwapResponse, TransactionStatus},
 };
-use crate::SwapperError;
-use gem_client::{Client, ClientExt, X_CACHE_TTL};
+use crate::{SwapperError, cache_headers};
+use gem_client::{Client, ClientExt};
+use primitives::duration::MINUTE;
 use serde_urlencoded;
-use std::{collections::HashMap, fmt::Debug};
+use std::fmt::Debug;
+
+const INBOUND_ADDRESS_CACHE_TTL_SECONDS: u64 = 10 * MINUTE.as_secs();
 
 #[derive(Clone, Debug)]
 pub struct ThorChainSwapClient<C>
@@ -48,8 +51,10 @@ where
     }
 
     pub async fn get_inbound_addresses(&self) -> Result<Vec<InboundAddress>, SwapperError> {
-        let headers = HashMap::from([(X_CACHE_TTL.to_string(), "600".to_string())]);
-        self.client.get_with_headers("/thorchain/inbound_addresses", headers).await.map_err(SwapperError::from)
+        self.client
+            .get_with_headers("/thorchain/inbound_addresses", cache_headers(INBOUND_ADDRESS_CACHE_TTL_SECONDS))
+            .await
+            .map_err(SwapperError::from)
     }
 
     pub async fn get_asgard_vaults(&self) -> Result<Vec<AsgardVault>, SwapperError> {
