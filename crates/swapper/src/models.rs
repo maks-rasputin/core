@@ -3,7 +3,7 @@ use crate::{SwapperProvider, SwapperQuoteAsset, SwapperSlippage, config::DEFAULT
 pub use primitives::swap::SwapResult;
 use primitives::{
     AssetId, Chain,
-    swap::{ApprovalData, SwapProviderMode},
+    swap::{ApprovalData, SwapProviderData, SwapProviderMode, SwapQuote},
 };
 use std::fmt::Debug;
 
@@ -91,6 +91,26 @@ pub struct Quote {
     pub data: ProviderData,
     pub request: QuoteRequest,
     pub eta_in_seconds: Option<u32>,
+}
+
+impl Quote {
+    pub fn as_primitive(self) -> SwapQuote {
+        let provider = self.data.provider;
+        SwapQuote {
+            from_address: self.request.wallet_address,
+            from_value: self.from_value,
+            to_address: self.request.destination_address,
+            to_value: self.to_value,
+            provider_data: SwapProviderData {
+                provider: provider.id,
+                name: provider.name,
+                protocol_name: provider.protocol,
+            },
+            slippage_bps: self.data.slippage_bps,
+            eta_in_seconds: self.eta_in_seconds,
+            use_max_amount: Some(self.request.options.use_max_amount),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
