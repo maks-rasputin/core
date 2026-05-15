@@ -21,8 +21,6 @@ pub use account::{GasObject, Owner, OwnerObject};
 #[cfg(feature = "rpc")]
 pub use coin::{Balance, BalanceChange};
 #[cfg(feature = "rpc")]
-pub use staking::RpcSuiSystemState;
+pub use staking::{EventStake, EventUnstake};
 #[cfg(feature = "rpc")]
-pub use staking::{EventStake, EventUnstake, ValidatorApy, ValidatorInfo, ValidatorSet};
-#[cfg(feature = "rpc")]
-pub use transaction::{Digest, Digests, Effect, Event, GasUsed, ResultData, Status, TransactionBroadcast};
+pub use transaction::{Digest, Effect, Event, GasUsed, Status, TransactionBroadcast};

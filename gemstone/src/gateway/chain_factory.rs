@@ -1,5 +1,5 @@
 use super::{GatewayError, GemPreferences, PreferencesWrapper};
-use crate::alien::{AlienProvider, new_alien_client};
+use crate::alien::{AlienProvider, AlienProviderWrapper, new_alien_client};
 use crate::network::JsonRpcClient;
 use chain_traits::ChainTraits;
 use gem_algorand::rpc::AlgorandClientIndexer;
@@ -10,6 +10,7 @@ use gem_cardano::rpc::client::CardanoClient;
 use gem_cosmos::rpc::client::CosmosClient;
 use gem_evm::rpc::EthereumClient;
 use gem_hypercore::rpc::client::HyperCoreClient;
+use gem_jsonrpc::grpc::AlienGrpcTransport;
 use gem_near::rpc::client::NearClient;
 use gem_polkadot::rpc::client::PolkadotClient;
 use gem_solana::rpc::client::SolanaClient;
@@ -42,7 +43,7 @@ impl ChainClientFactory {
     }
 
     pub async fn create_with_url(&self, chain: Chain, url: String) -> Result<Arc<dyn ChainTraits>, GatewayError> {
-        let alien_client = new_alien_client(url, self.alien.clone());
+        let alien_client = new_alien_client(url.clone(), self.alien.clone());
         match chain {
             Chain::HyperCore => {
                 let preferences = Arc::new(PreferencesWrapper {
@@ -58,7 +59,10 @@ impl ChainClientFactory {
             }
             Chain::Cardano => Ok(Arc::new(CardanoClient::new(alien_client))),
             Chain::Stellar => Ok(Arc::new(StellarClient::new(alien_client))),
-            Chain::Sui => Ok(Arc::new(SuiClient::new(JsonRpcClient::new(alien_client.clone())))),
+            Chain::Sui => Ok(Arc::new(SuiClient::new_with_transport(
+                url,
+                Arc::new(AlienGrpcTransport::new(Arc::new(AlienProviderWrapper::new(self.alien.clone())))),
+            ))),
             Chain::Xrp => Ok(Arc::new(XRPClient::new(JsonRpcClient::new(alien_client.clone())))),
             Chain::Algorand => Ok(Arc::new(AlgorandClient::new(alien_client.clone(), AlgorandClientIndexer::new(alien_client.clone())))),
             Chain::Near => Ok(Arc::new(NearClient::new(JsonRpcClient::new(alien_client.clone())))),

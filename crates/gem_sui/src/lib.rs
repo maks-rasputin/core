@@ -19,7 +19,6 @@ pub use transfer_builder::*;
 
 pub mod error;
 pub mod gas_budget;
-pub mod jsonrpc;
 pub mod tx_builder;
 
 #[cfg(feature = "signer")]

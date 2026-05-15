@@ -8,16 +8,11 @@ use crate::{
     FetchQuoteData, ProviderData, ProviderType, Quote, QuoteRequest, Route, Swapper, SwapperChainAsset, SwapperError, SwapperQuoteData, fees::quote_value_after_reserve_by_chain,
 };
 use async_trait::async_trait;
-use gem_client::Client;
 use gem_sui::coin_type_matches;
 use primitives::Chain;
-use std::fmt::Debug;
 
 #[async_trait]
-impl<C> Swapper for CetusClmm<C>
-where
-    C: Client + Clone + Send + Sync + Debug + 'static,
-{
+impl Swapper for CetusClmm {
     fn provider(&self) -> &ProviderType {
         &self.provider
     }
@@ -35,11 +30,11 @@ where
             return Err(SwapperError::InputAmountError { min_amount: Some("1".into()) });
         }
 
-        let from_coin_type = CetusClmm::<C>::coin_type(&from_asset);
-        let to_coin_type = CetusClmm::<C>::coin_type(&to_asset);
+        let from_coin_type = CetusClmm::coin_type(&from_asset);
+        let to_coin_type = CetusClmm::coin_type(&to_asset);
         let fee_side = FeeSide::select(&from_coin_type, &to_coin_type);
 
-        let referral_fee = CetusClmm::<C>::referral_fee();
+        let referral_fee = CetusClmm::referral_fee();
         let input_fee_amount = tx_builder::referral_fee_amount(amount, referral_fee.bps)?;
         let swap_amount = match fee_side {
             FeeSide::Input => amount
@@ -78,13 +73,13 @@ where
         let route_entry = quote.data.routes.first().ok_or(SwapperError::InvalidRoute)?;
         let route: PoolRoute = serde_json::from_str(&route_entry.route_data).map_err(|_| SwapperError::InvalidRoute)?;
 
-        let request_from = CetusClmm::<C>::coin_type(&quote.request.from_asset.asset_id());
-        let request_to = CetusClmm::<C>::coin_type(&quote.request.to_asset.asset_id());
+        let request_from = CetusClmm::coin_type(&quote.request.from_asset.asset_id());
+        let request_to = CetusClmm::coin_type(&quote.request.to_asset.asset_id());
         if !coin_type_matches(&request_from, route.input_coin_type()) || !coin_type_matches(&request_to, route.output_coin_type()) {
             return Err(SwapperError::InvalidRoute);
         }
 
-        tx_builder::build_quote_data(&self.sui_client, quote, &route, &CetusClmm::<C>::referral_fee(), CETUS_CLMM_PUBLISHED_AT).await
+        tx_builder::build_quote_data(&self.sui_client, quote, &route, &CetusClmm::referral_fee(), CETUS_CLMM_PUBLISHED_AT).await
     }
 }
 

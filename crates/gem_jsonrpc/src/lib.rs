@@ -5,6 +5,8 @@ pub mod alien;
 #[cfg(feature = "client")]
 pub mod client;
 #[cfg(feature = "client")]
+pub mod grpc;
+#[cfg(feature = "client")]
 pub use client::*;
 #[cfg(feature = "testkit")]
 pub mod testkit;

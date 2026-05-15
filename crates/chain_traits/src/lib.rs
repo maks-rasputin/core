@@ -1,4 +1,4 @@
-use std::error::Error;
+use std::{error::Error, str};
 
 use async_trait::async_trait;
 use primitives::chart::ChartCandleStick;
@@ -110,6 +110,10 @@ pub trait ChainTransactionBroadcast: Send + Sync {
 pub trait ChainTransactionDecode: Send + Sync {
     fn decode_transaction_broadcast(&self, _response: &str) -> Option<String> {
         None
+    }
+
+    fn decode_transaction_broadcast_bytes(&self, response: &[u8]) -> Option<String> {
+        str::from_utf8(response).ok().and_then(|response| self.decode_transaction_broadcast(response))
     }
 }
 

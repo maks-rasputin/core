@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use futures::TryFutureExt;
 use gem_jsonrpc::RpcResponse;
 use gem_jsonrpc::rpc::RpcProvider as GenericRpcProvider;
-use reqwest::Client;
+use reqwest::{Client, Method};
 
 #[derive(Debug)]
 pub struct NativeProvider {
@@ -71,7 +71,7 @@ impl GenericRpcProvider for NativeProvider {
             HttpMethod::Delete => self.client.delete(target.url),
             HttpMethod::Head => self.client.head(target.url),
             HttpMethod::Patch => self.client.patch(target.url),
-            HttpMethod::Options => todo!(),
+            HttpMethod::Options => self.client.request(Method::OPTIONS, target.url),
         };
         if let Some(headers) = target.headers {
             for (key, value) in headers.iter() {
@@ -82,8 +82,10 @@ impl GenericRpcProvider for NativeProvider {
             if self.debug && body.len() <= 4096 {
                 if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&body) {
                     println!("=== json: {json:?}");
+                } else if let Ok(text) = std::str::from_utf8(&body) {
+                    println!("=== body: {text:?}");
                 } else {
-                    println!("=== body: {:?}", String::from_utf8(body.to_vec()).unwrap());
+                    println!("=== binary body size: {:?}", body.len());
                 }
             }
             req = req.body(body);
@@ -98,8 +100,10 @@ impl GenericRpcProvider for NativeProvider {
         if self.debug && bytes.len() <= 4096 {
             if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&bytes) {
                 println!("=== json: {json:?}");
+            } else if let Ok(text) = std::str::from_utf8(&bytes) {
+                println!("=== body: {text:?}");
             } else {
-                println!("=== body: {:?}", String::from_utf8(bytes.to_vec()).unwrap());
+                println!("=== binary body size: {:?}", bytes.len());
             }
         }
         Ok(RpcResponse {

@@ -203,8 +203,7 @@ mod tests {
 
     #[test]
     fn test_map_smart_contract_call() {
-        let response: serde_json::Value = serde_json::from_str(include_str!("../../testdata/transfer_token_contract.json")).unwrap();
-        let digest: Digest = serde_json::from_value(response["result"].clone()).unwrap();
+        let digest: Digest = serde_json::from_str(include_str!("../../testdata/transfer_token_contract.json")).unwrap();
         let transaction = map_transaction(digest).unwrap();
 
         assert_eq!(transaction.transaction_type, TransactionType::SmartContractCall);
@@ -216,8 +215,7 @@ mod tests {
 
     #[test]
     fn test_map_transaction_by_hash() {
-        let response: serde_json::Value = serde_json::from_str(include_str!("../../testdata/transfer_sui.json")).unwrap();
-        let digest: Digest = serde_json::from_value(response["result"].clone()).unwrap();
+        let digest: Digest = serde_json::from_str(include_str!("../../testdata/transfer_sui.json")).unwrap();
         let transaction = map_transaction(digest).unwrap();
 
         assert_eq!(transaction.hash, TEST_TRANSACTION_ID);

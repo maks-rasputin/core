@@ -29,7 +29,7 @@ simulation = { path = "../crates/simulation", features = ["rpc"] }
 gem_sui = { path = "../crates/gem_sui", features = ["rpc", "signer"] }
 gem_aptos = { path = "../crates/gem_aptos", features = ["rpc"] }
 gem_auth = { path = "../crates/gem_auth" }
-gem_jsonrpc = { path = "../crates/gem_jsonrpc" }
+gem_jsonrpc = { path = "../crates/gem_jsonrpc", features = ["client"] }
 gem_client = { path = "../crates/gem_client" }
 gem_hypercore = { path = "../crates/gem_hypercore", features = ["signer"] }
 gem_bitcoin = { path = "../crates/gem_bitcoin", features = ["rpc"] }
@@ -70,5 +70,4 @@ zeroize = { workspace = true }
 uniffi = { workspace = true, features = ["build"] }
 
 [dev-dependencies]
-tokio.workspace = true
 primitives = { path = "../crates/primitives", features = ["testkit"] }

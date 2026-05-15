@@ -77,7 +77,7 @@ name:
   did:
     url: https://indexer-basic.did.id
   suins:
-    url: https://suins-rpc.mainnet.sui.io
+    url: https://fullnode.mainnet.sui.io
   aptos:
     url: https://aptosnames.com
   injective:
@@ -132,7 +132,7 @@ chains:
   aptos:
     url: https://fullnode.mainnet.aptoslabs.com
   sui:
-    url: https://suins-rpc.mainnet.sui.io
+    url: https://fullnode.mainnet.sui.io
   celestia:
     url: https://celestia-api.polkachu.com
   injective:

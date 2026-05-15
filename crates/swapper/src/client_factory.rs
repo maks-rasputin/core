@@ -1,6 +1,8 @@
 use gem_evm::rpc::EthereumClient;
 use gem_jsonrpc::alien::{self, RpcClient, RpcProvider};
 use gem_jsonrpc::client::JsonRpcClient;
+use gem_jsonrpc::grpc::AlienGrpcTransport;
+use gem_sui::rpc::client::SuiClient;
 use primitives::{Chain, EVMChain};
 use std::sync::Arc;
 
@@ -8,6 +10,11 @@ use crate::SwapperError;
 
 pub fn create_client_with_chain(provider: Arc<dyn RpcProvider>, chain: Chain) -> JsonRpcClient<RpcClient> {
     alien::create_client(provider, chain).expect("failed to create client for chain")
+}
+
+pub fn create_sui_client(provider: Arc<dyn RpcProvider>) -> Result<SuiClient, SwapperError> {
+    let endpoint = provider.get_endpoint(Chain::Sui).map_err(|_| SwapperError::NotSupportedChain)?;
+    Ok(SuiClient::new_with_transport(endpoint, Arc::new(AlienGrpcTransport::new(provider))))
 }
 
 pub fn create_eth_client(provider: Arc<dyn RpcProvider>, chain: Chain) -> Result<EthereumClient<RpcClient>, SwapperError> {

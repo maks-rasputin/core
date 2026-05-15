@@ -4,8 +4,6 @@ use std::error::Error;
 use async_trait::async_trait;
 #[cfg(feature = "rpc")]
 use chain_traits::ChainBalances;
-#[cfg(feature = "rpc")]
-use gem_client::Client;
 use primitives::AssetBalance;
 
 use crate::provider::balances_mapper::{map_assets_balances, map_balance_coin, map_balance_staking, map_balance_tokens};
@@ -13,7 +11,7 @@ use crate::rpc::client::SuiClient;
 
 #[cfg(feature = "rpc")]
 #[async_trait]
-impl<C: Client + Clone> ChainBalances for SuiClient<C> {
+impl ChainBalances for SuiClient {
     async fn get_balance_coin(&self, address: String) -> Result<AssetBalance, Box<dyn Error + Sync + Send>> {
         Ok(map_balance_coin(self.get_balance(address).await?))
     }

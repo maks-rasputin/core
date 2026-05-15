@@ -1,10 +1,6 @@
 #[cfg(all(test, feature = "chain_integration_tests"))]
 use crate::SuiClient;
 #[cfg(all(test, feature = "chain_integration_tests"))]
-use gem_client::ReqwestClient;
-#[cfg(all(test, feature = "chain_integration_tests"))]
-use gem_jsonrpc::client::JsonRpcClient;
-#[cfg(all(test, feature = "chain_integration_tests"))]
 use primitives::asset_constants::SUI_USDC_TOKEN_ID;
 #[cfg(all(test, feature = "chain_integration_tests"))]
 use settings::testkit::get_test_settings;
@@ -21,8 +17,7 @@ pub const TEST_TOKEN_ADDRESS: &str = SUI_USDC_TOKEN_ID;
 pub const TEST_TRANSACTION_ID: &str = "CJ16PEqq49KFp758iEVwxEkd3CwP7zDfqGYLuLuu9Z63";
 
 #[cfg(all(test, feature = "chain_integration_tests"))]
-pub fn create_sui_test_client() -> SuiClient<ReqwestClient> {
+pub fn create_sui_test_client() -> SuiClient {
     let settings = get_test_settings();
-    let reqwest_client = ReqwestClient::new(settings.chains.sui.url, reqwest::Client::new());
-    SuiClient::new(JsonRpcClient::new(reqwest_client))
+    SuiClient::new(settings.chains.sui.url)
 }

@@ -4,19 +4,17 @@ use std::error::Error;
 use async_trait::async_trait;
 #[cfg(feature = "rpc")]
 use chain_traits::ChainToken;
-#[cfg(feature = "rpc")]
-use gem_client::Client;
-use primitives::Asset;
+use primitives::{Asset, Chain};
 
 use crate::provider::token_mapper::{map_is_token_address, map_token_data};
 use crate::rpc::client::SuiClient;
 
 #[cfg(feature = "rpc")]
 #[async_trait]
-impl<C: Client + Clone> ChainToken for SuiClient<C> {
+impl ChainToken for SuiClient {
     async fn get_token_data(&self, token_id: String) -> Result<Asset, Box<dyn Error + Sync + Send>> {
         let metadata = self.get_coin_metadata(token_id.clone()).await?;
-        Ok(map_token_data(self.chain, &token_id, metadata))
+        Ok(map_token_data(Chain::Sui, &token_id, metadata))
     }
 
     fn get_is_token_address(&self, token_id: &str) -> bool {

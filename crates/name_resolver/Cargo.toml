@@ -16,6 +16,8 @@ alloy-sol-types = { workspace = true }
 alloy-ens = { version = "2.0.0" }
 gem_client = { path = "../gem_client", features = ["reqwest"] }
 gem_jsonrpc = { path = "../gem_jsonrpc", features = ["client"] }
+sui-rpc = { workspace = true }
+tonic = { workspace = true }
 idna = { version = "1.1.0" }
 
 settings = { path = "../settings" }

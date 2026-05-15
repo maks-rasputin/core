@@ -5,16 +5,14 @@ use super::{
     tx_builder,
 };
 use crate::{
-    ProviderType, RpcClient, RpcProvider, SwapperError, SwapperProvider,
-    client_factory::create_client_with_chain,
+    ProviderType, RpcProvider, SwapperError, SwapperProvider,
+    client_factory::create_sui_client,
     fees::{ReferralFee, default_referral_fees},
 };
-use gem_client::Client;
 use gem_sui::{EMPTY_ADDRESS, SUI_COIN_TYPE, SuiClient, coin_type_matches, full_coin_type, models::InspectResult, tx_builder::ObjectResolver};
-use primitives::{AssetId, Chain};
+use primitives::AssetId;
 use std::{
     collections::{HashMap, HashSet},
-    fmt::Debug,
     sync::Arc,
 };
 
@@ -34,33 +32,25 @@ struct PhaseResult {
     best_route: Option<(Vec<Hop>, u32)>,
 }
 
-pub struct CetusClmm<C>
-where
-    C: Client + Clone + Send + Sync + Debug + 'static,
-{
+pub struct CetusClmm {
     pub(super) provider: ProviderType,
-    pub(super) sui_client: SuiClient<C>,
+    pub(super) sui_client: SuiClient,
     pool_cache: PoolCache,
 }
 
-impl<C: Client + Clone + Send + Sync + Debug + 'static> Debug for CetusClmm<C> {
+impl std::fmt::Debug for CetusClmm {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("CetusClmm")
     }
 }
 
-impl CetusClmm<RpcClient> {
+impl CetusClmm {
     pub fn new(rpc_provider: Arc<dyn RpcProvider>) -> Self {
-        let sui_client = create_client_with_chain(rpc_provider, Chain::Sui);
-        Self::with_client(SuiClient::new(sui_client))
+        let sui_client = create_sui_client(rpc_provider).expect("failed to create Sui gRPC client");
+        Self::with_client(sui_client)
     }
-}
 
-impl<C> CetusClmm<C>
-where
-    C: Client + Clone + Send + Sync + Debug + 'static,
-{
-    pub fn with_client(sui_client: SuiClient<C>) -> Self {
+    pub fn with_client(sui_client: SuiClient) -> Self {
         Self {
             provider: ProviderType::new(SwapperProvider::CetusClmm),
             sui_client,

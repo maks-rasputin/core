@@ -59,7 +59,7 @@ chains:
   # Sui
   - chain: sui
     urls:
-      - url: https://sui-mainnet-endpoint.blockvision.org
+      - url: https://fullnode.mainnet.sui.io
 
   # XRP
   - chain: xrp

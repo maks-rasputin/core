@@ -1,26 +1,24 @@
 #[cfg(feature = "rpc")]
 use chain_traits::{ChainAccount, ChainAddressStatus, ChainPerpetual, ChainProvider, ChainTraits};
-#[cfg(feature = "rpc")]
-use gem_client::Client;
 use primitives::Chain;
 
 use crate::rpc::client::SuiClient;
 
 #[cfg(feature = "rpc")]
-impl<C: Client + Clone> ChainTraits for SuiClient<C> {}
+impl ChainTraits for SuiClient {}
 
 #[cfg(feature = "rpc")]
-impl<C: Client + Clone> ChainProvider for SuiClient<C> {
+impl ChainProvider for SuiClient {
     fn get_chain(&self) -> Chain {
-        self.chain
+        Chain::Sui
     }
 }
 
 #[cfg(feature = "rpc")]
-impl<C: Client + Clone> ChainAccount for SuiClient<C> {}
+impl ChainAccount for SuiClient {}
 
 #[cfg(feature = "rpc")]
-impl<C: Client + Clone> ChainPerpetual for SuiClient<C> {}
+impl ChainPerpetual for SuiClient {}
 
 #[cfg(feature = "rpc")]
-impl<C: Client + Clone> ChainAddressStatus for SuiClient<C> {}
+impl ChainAddressStatus for SuiClient {}

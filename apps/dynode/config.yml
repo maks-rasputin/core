@@ -24,9 +24,11 @@ request:
 
 headers:
   forward:
+    - accept
     - content-type
     - content-encoding
     - content-length
+    - te
   domains:
     public-eth.nownodes.io:
       - user-agent
@@ -67,11 +69,6 @@ cache:
     solana:
       - rpc_method: getVoteAccounts
         ttl: 1h
-    sui:
-      - rpc_method: suix_getValidatorsApy
-        ttl: 1h
-      - rpc_method: suix_getLatestSuiSystemState
-        ttl: 1m
     cosmos:
       - path: /cosmos/staking/v1beta1/validators
         method: GET

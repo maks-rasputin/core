@@ -4,8 +4,6 @@ use std::{collections::HashMap, error::Error};
 use async_trait::async_trait;
 #[cfg(feature = "rpc")]
 use chain_traits::ChainTransactionLoad;
-#[cfg(feature = "rpc")]
-use gem_client::Client;
 use num_bigint::BigInt;
 use primitives::{
     FeeRate, GasPriceType, StakeType, TransactionFee, TransactionInputType, TransactionLoadData, TransactionLoadInput, TransactionLoadMetadata, TransactionPreloadInput,
@@ -23,13 +21,13 @@ use crate::{
 
 #[cfg(feature = "rpc")]
 #[async_trait]
-impl<C: Client + Clone> ChainTransactionLoad for SuiClient<C> {
+impl ChainTransactionLoad for SuiClient {
     async fn get_transaction_preload(&self, _input: TransactionPreloadInput) -> Result<TransactionLoadMetadata, Box<dyn Error + Sync + Send>> {
         Ok(TransactionLoadMetadata::None)
     }
 
     async fn get_transaction_load(&self, input: TransactionLoadInput) -> Result<TransactionLoadData, Box<dyn Error + Sync + Send>> {
-        let (gas_coins, coins, objects) = self.get_coins_for_input_type(&input.sender_address.clone(), input.input_type.clone()).await?;
+        let (gas_coins, coins, objects) = self.get_coins_for_input_type(input.sender_address.as_str(), input.input_type.clone()).await?;
 
         let estimate_bytes = map_transaction_data(input.clone(), gas_coins.clone(), coins.clone(), objects.clone(), ESTIMATION_GAS_BUDGET)?;
         let fee = self.estimate_fee(&estimate_bytes, &input.gas_price, input.is_max_value).await?;
@@ -58,7 +56,7 @@ fn estimated_gas_budget(input_type: &TransactionInputType, fee: &TransactionFee)
     }
 }
 
-impl<C: Client + Clone> SuiClient<C> {
+impl SuiClient {
     async fn estimate_fee(&self, tx_data: &str, gas_price: &GasPriceType, is_max_value: bool) -> Result<TransactionFee, Box<dyn Error + Send + Sync>> {
         let tx_data_only = tx_data.split('_').next().unwrap_or(tx_data);
         let result = self.dry_run(tx_data_only.to_string()).await?;
@@ -72,9 +70,7 @@ impl<C: Client + Clone> SuiClient<C> {
             options: HashMap::new(),
         })
     }
-}
 
-impl<C: Client + Clone> SuiClient<C> {
     async fn get_coins_for_input_type(
         &self,
         address: &str,

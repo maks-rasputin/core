@@ -127,7 +127,7 @@ impl ProviderFactory {
                 Box::new(CosmosClient::new(chain, gem_client.clone()))
             }
             Chain::Aptos => Box::new(AptosClient::new(gem_client.clone())),
-            Chain::Sui => Box::new(SuiClient::new(JsonRpcClient::new(gem_client.clone()))),
+            Chain::Sui => Box::new(SuiClient::new(url)),
             Chain::Xrp => Box::new(XRPClient::new(JsonRpcClient::new(gem_client.clone()))),
             Chain::Algorand => {
                 let indexer_client = ReqwestClient::new(ALGORAND_INDEXER_URL.to_string(), reqwest_client.clone());

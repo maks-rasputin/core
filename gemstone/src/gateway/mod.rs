@@ -256,15 +256,15 @@ impl GemGateway {
 #[cfg(all(test, feature = "reqwest_provider"))]
 mod tests {
     use super::*;
-    use crate::alien::reqwest_provider::NativeProvider;
+    use crate::testkit::TestAlienProvider;
 
-    #[tokio::test]
-    async fn test_get_node_status_http_404_error() {
-        let provider: Arc<dyn AlienProvider> = Arc::new(NativeProvider::new().set_debug(false));
+    #[test]
+    fn test_get_node_status_http_404_error() {
+        let provider: Arc<dyn AlienProvider> = Arc::new(TestAlienProvider::with_status(404));
         let preferences: Arc<dyn GemPreferences> = Arc::new(EmptyPreferences {});
         let gateway = GemGateway::new(provider, preferences.clone(), preferences.clone(), "https://example.invalid".to_string());
 
-        let result = gateway.get_node_status(Chain::Bitcoin, "https://httpbin.org/status/404").await;
+        let result = futures::executor::block_on(gateway.get_node_status(Chain::Bitcoin, "https://httpbin.org/status/404"));
 
         match result {
             Ok(status) => panic!("expected network error for 404 response, got {:?}", status),

@@ -19,13 +19,13 @@ gem_sui = { path = "../gem_sui", features = ["rpc"] }
 gem_aptos = { path = "../gem_aptos", features = ["rpc"] }
 gem_cosmos = { path = "../gem_cosmos" }
 gem_hash = { path = "../gem_hash" }
-gem_jsonrpc = { path = "../gem_jsonrpc" }
+gem_jsonrpc = { path = "../gem_jsonrpc", features = ["client"] }
 gem_client = { path = "../gem_client" }
 gem_hypercore = { path = "../gem_hypercore" }
 serde_serializers = { path = "../serde_serializers", features = ["bigint"] }
 number_formatter = { path = "../number_formatter" }
 sui-types = { workspace = true }
-sui-transaction-builder = { package = "sui-transaction-builder", version = "0.3.0" }
+sui-transaction-builder = { package = "sui-transaction-builder", version = "0.3.1", default-features = false }
 
 reqwest = { workspace = true, optional = true }
 typeshare = { version = "1.0.4" }

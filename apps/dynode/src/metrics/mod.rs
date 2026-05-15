@@ -262,7 +262,7 @@ mod tests {
         let m = create_test_metrics();
 
         assert_eq!(m.truncate_method("eth_getBlockByNumber"), "eth_getBlockByNumber");
-        assert_eq!(m.truncate_method("suix_getLatestSuiSystemState"), "suix_getLatestSuiSystemState");
+        assert_eq!(m.truncate_method("eth_getBalance"), "eth_getBalance");
         assert_eq!(m.truncate_method("/api/v1/blocks/by_height/12345"), "/api/v1/blocks/by_height/:number");
         assert_eq!(m.truncate_method("/v1/verylongsegmentthatisgreaterthan20characters"), "/v1/:value");
     }

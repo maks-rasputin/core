@@ -48,8 +48,7 @@ impl DynodeBroadcastWebhookClient {
     }
 
     fn extract_payload(&self, request: &ProxyRequest, response_body: &[u8], broadcast_providers: &BroadcastProviders) -> Option<TransactionId> {
-        let response = parse_response_body(request, response_body)?;
-        let identifier = broadcast_providers.decode_transaction_broadcast(request.chain, response)?;
+        let identifier = broadcast_providers.decode_transaction_broadcast(request.chain, response_body)?;
         Some(TransactionId::new(request.chain, identifier))
     }
 
@@ -90,16 +89,6 @@ impl DynodeBroadcastWebhookClient {
 
 fn is_success_status(status: u16) -> bool {
     (200..300).contains(&status)
-}
-
-fn parse_response_body<'a>(request: &ProxyRequest, response_body: &'a [u8]) -> Option<&'a str> {
-    match std::str::from_utf8(response_body) {
-        Ok(response) => Some(response),
-        Err(err) => {
-            error_with_fields!("broadcast webhook decode failed", &err, chain = request.chain.as_ref(), request_id = request.id.as_str(),);
-            None
-        }
-    }
 }
 
 fn is_broadcast_request(request: &ProxyRequest, broadcast_providers: &BroadcastProviders) -> bool {

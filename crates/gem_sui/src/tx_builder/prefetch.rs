@@ -1,7 +1,6 @@
 use super::{ObjectResolver, TransactionBuilderInput};
 use crate::{SuiClient, SuiError, is_sui_coin, models::CoinAsset};
 use futures::try_join;
-use gem_client::Client;
 use std::collections::HashMap;
 
 pub struct PrefetchedTransactionData {
@@ -12,8 +11,8 @@ pub struct PrefetchedTransactionData {
 }
 
 impl PrefetchedTransactionData {
-    pub async fn prefetch<C: Client + Clone>(
-        client: &SuiClient<C>,
+    pub async fn prefetch(
+        client: &SuiClient,
         sender: &str,
         input_coin_type: &str,
         output_coin_type: Option<&str>,
@@ -43,7 +42,7 @@ impl PrefetchedTransactionData {
     }
 }
 
-async fn get_user_coins<C: Client + Clone>(client: &SuiClient<C>, owner: &str, coin_type: &str) -> Result<Vec<CoinAsset>, SuiError> {
+async fn get_user_coins(client: &SuiClient, owner: &str, coin_type: &str) -> Result<Vec<CoinAsset>, SuiError> {
     if is_sui_coin(coin_type) {
         Ok(Vec::new())
     } else {

@@ -5,13 +5,12 @@ use crate::{
     tx_builder::{encode_token_transfer, encode_transfer},
 };
 use futures::try_join;
-use gem_client::Client;
 use num_traits::ToPrimitive;
 use std::error::Error;
 
 #[allow(clippy::too_many_arguments)]
-pub async fn build_transfer_message_bytes<C: Client + Clone>(
-    client: &SuiClient<C>,
+pub async fn build_transfer_message_bytes(
+    client: &SuiClient,
     sender: &str,
     recipient: &str,
     amount: u64,
@@ -42,7 +41,7 @@ pub async fn build_transfer_message_bytes<C: Client + Clone>(
     Ok(tx_output.base64_encoded())
 }
 
-async fn get_token_coins<C: Client + Clone>(client: &SuiClient<C>, sender: &str, token_type: &str) -> Result<Vec<Coin>, Box<dyn Error + Send + Sync>> {
+async fn get_token_coins(client: &SuiClient, sender: &str, token_type: &str) -> Result<Vec<Coin>, Box<dyn Error + Send + Sync>> {
     let objs = client.get_coins(sender, token_type).await?;
     let coins: Vec<Coin> = objs.into_iter().map(Into::into).collect();
     if coins.is_empty() {
@@ -101,9 +100,7 @@ mod chain_integration_tests {
     async fn test_build_transfer_message_bytes_native() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let client = create_sui_test_client();
         let message = build_transfer_message_bytes(&client, TEST_ADDRESS, TEST_ADDRESS, 1, None).await?;
-        let (payload, digest) = message.split_once('_').ok_or("Missing digest separator")?;
-        decode_base64(payload)?;
-        hex::decode(digest)?;
+        decode_base64(&message)?;
         Ok(())
     }
 
@@ -111,9 +108,7 @@ mod chain_integration_tests {
     async fn test_build_transfer_message_bytes_token() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let client = create_sui_test_client();
         let message = build_transfer_message_bytes(&client, TEST_ADDRESS, TEST_ADDRESS, 1, Some(TEST_TOKEN_ADDRESS)).await?;
-        let (payload, digest) = message.split_once('_').ok_or("Missing digest separator")?;
-        decode_base64(payload)?;
-        hex::decode(digest)?;
+        decode_base64(&message)?;
         Ok(())
     }
 }

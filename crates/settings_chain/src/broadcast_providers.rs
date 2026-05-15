@@ -26,8 +26,8 @@ impl BroadcastProviders {
         self.get_provider(chain).map_or(ChainRequestType::Unknown, |provider| provider.classify_request(request))
     }
 
-    pub fn decode_transaction_broadcast(&self, chain: Chain, response: &str) -> Option<String> {
-        self.get_provider(chain).and_then(|provider| provider.decode_transaction_broadcast(response))
+    pub fn decode_transaction_broadcast(&self, chain: Chain, response: &[u8]) -> Option<String> {
+        self.get_provider(chain).and_then(|provider| provider.decode_transaction_broadcast_bytes(response))
     }
 }
 

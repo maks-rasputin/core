@@ -1,13 +1,9 @@
-use crate::{
-    SuiClient, SuiError,
-    jsonrpc::{DataObject, ObjectDataOptions, SuiRpc},
-    models::ResultData,
-};
-use gem_client::Client;
+use crate::{SuiClient, SuiError};
 use std::{
     collections::{BTreeSet, HashMap},
     str::FromStr,
 };
+use sui_rpc::proto::sui::rpc::v2::owner::OwnerKind;
 use sui_transaction_builder::{Argument, ObjectInput, TransactionBuilder};
 use sui_types::Address;
 
@@ -16,23 +12,25 @@ pub struct ObjectResolver {
 }
 
 impl ObjectResolver {
-    pub async fn prefetch<C: Client + Clone>(client: &SuiClient<C>, object_ids: Vec<String>, pinned: &HashMap<String, u64>) -> Result<Self, SuiError> {
+    pub async fn prefetch(client: &SuiClient, object_ids: Vec<String>, pinned: &HashMap<String, u64>) -> Result<Self, SuiError> {
         let unique_ids: Vec<String> = object_ids.into_iter().collect::<BTreeSet<_>>().into_iter().collect();
         let missing: Vec<String> = unique_ids.iter().filter(|id| !pinned.contains_key(*id)).cloned().collect();
 
-        let fetched: Vec<ResultData<DataObject<()>>> = if missing.is_empty() {
+        let fetched = if missing.is_empty() {
             Vec::new()
         } else {
-            client
-                .rpc_call(SuiRpc::GetMultipleObjects(missing.clone(), Some(ObjectDataOptions::owner_only())))
-                .await
-                .map_err(|err| SuiError::invalid_input(err.to_string()))?
+            client.get_multiple_objects(missing).await.map_err(|err| SuiError::invalid_input(err.to_string()))?
         };
 
         let mut shared_versions: HashMap<String, u64> = fetched
             .into_iter()
-            .zip(&missing)
-            .filter_map(|(result, id)| result.data.initial_shared_version().map(|version| (id.clone(), version)))
+            .filter_map(|object| {
+                let id = object.object_id?;
+                object.owner.and_then(|owner| match OwnerKind::try_from(owner.kind.unwrap_or_default()) {
+                    Ok(OwnerKind::Shared) => owner.version.map(|version| (id, version)),
+                    _ => None,
+                })
+            })
             .collect();
         for id in &unique_ids {
             if let Some(&version) = pinned.get(id) {

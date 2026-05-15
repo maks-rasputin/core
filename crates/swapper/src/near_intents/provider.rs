@@ -7,7 +7,7 @@ use super::{
 use crate::{
     FetchQuoteData, ProviderData, ProviderType, Quote, QuoteRequest, Route, RpcClient, RpcProvider, SwapResult, Swapper, SwapperChainAsset, SwapperError, SwapperProvider,
     SwapperQuoteAsset, SwapperQuoteData, amount_to_value,
-    client_factory::create_client_with_chain,
+    client_factory::create_sui_client,
     cross_chain::VaultAddresses,
     fees::DEFAULT_REFERRER,
     fees::quote_value_after_reserve_by_chain,
@@ -58,7 +58,7 @@ where
     client: NearIntentsClient<C>,
     explorer: NearIntentsExplorer<C>,
     supported_assets: Vec<SwapperChainAsset>,
-    sui_client: Arc<SuiClient<RpcClient>>,
+    sui_client: Arc<SuiClient>,
 }
 
 impl<C> std::fmt::Debug for NearIntents<C>
@@ -71,7 +71,7 @@ where
             .field("client", &self.client)
             .field("explorer", &self.explorer)
             .field("supported_assets", &self.supported_assets)
-            .field("sui_client", &"SuiClient::<RpcClient>")
+            .field("sui_client", &"SuiClient")
             .finish()
     }
 }
@@ -80,7 +80,7 @@ impl NearIntents<RpcClient> {
     pub fn new(rpc_provider: Arc<dyn RpcProvider>) -> Self {
         let client = NearIntentsClient::new(RpcClient::new(base_url(), rpc_provider.clone()), None);
         let explorer = NearIntentsExplorer::new(RpcClient::new(explorer_url(), rpc_provider.clone()));
-        let sui_client = Arc::new(SuiClient::new(create_client_with_chain(rpc_provider.clone(), Chain::Sui)));
+        let sui_client = Arc::new(create_sui_client(rpc_provider.clone()).expect("failed to create Sui gRPC client"));
         Self::with_client(client, explorer, sui_client)
     }
 
@@ -93,7 +93,7 @@ impl<C> NearIntents<C>
 where
     C: gem_client::Client + Clone + Send + Sync + Debug + 'static,
 {
-    pub fn with_client(client: NearIntentsClient<C>, explorer: NearIntentsExplorer<C>, sui_client: Arc<SuiClient<RpcClient>>) -> Self {
+    pub fn with_client(client: NearIntentsClient<C>, explorer: NearIntentsExplorer<C>, sui_client: Arc<SuiClient>) -> Self {
         Self {
             provider: ProviderType::new(SwapperProvider::NearIntents),
             client,

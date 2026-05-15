@@ -5,8 +5,6 @@ use async_trait::async_trait;
 #[cfg(feature = "rpc")]
 use chain_traits::ChainState;
 #[cfg(feature = "rpc")]
-use gem_client::Client;
-#[cfg(feature = "rpc")]
 use primitives::NodeSyncStatus;
 
 use crate::provider::state_mapper;
@@ -14,7 +12,7 @@ use crate::rpc::client::SuiClient;
 
 #[cfg(feature = "rpc")]
 #[async_trait]
-impl<C: Client + Clone> ChainState for SuiClient<C> {
+impl ChainState for SuiClient {
     async fn get_chain_id(&self) -> Result<String, Box<dyn Error + Sync + Send>> {
         self.get_chain_id().await
     }

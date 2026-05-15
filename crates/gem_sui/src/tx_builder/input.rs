@@ -1,8 +1,6 @@
 #[cfg(feature = "rpc")]
 use crate::{SUI_COIN_TYPE, SuiClient, SuiError, models::CoinAsset};
 #[cfg(feature = "rpc")]
-use gem_client::Client;
-#[cfg(feature = "rpc")]
 use num_traits::ToPrimitive;
 use sui_transaction_builder::ObjectInput;
 
@@ -31,7 +29,7 @@ impl TransactionBuilderInput {
     }
 
     #[cfg(feature = "rpc")]
-    pub async fn prefetch<C: Client + Clone>(client: &SuiClient<C>, sender: &str, gas_budget: u64) -> Result<Self, SuiError> {
+    pub async fn prefetch(client: &SuiClient, sender: &str, gas_budget: u64) -> Result<Self, SuiError> {
         let gas_price = client
             .get_gas_price()
             .await

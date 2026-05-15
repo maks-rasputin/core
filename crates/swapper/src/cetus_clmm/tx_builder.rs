@@ -7,7 +7,6 @@ use super::{
     model::{FeeSide, Hop, PoolRoute},
 };
 use crate::{Quote, SwapperError, SwapperQuoteData, fees::ReferralFee, fees::apply_slippage_in_bp};
-use gem_client::Client;
 use gem_sui::{
     EMPTY_ADDRESS, ESTIMATION_GAS_BUDGET, SuiClient,
     gas_budget::GAS_BUDGET_MULTIPLIER,
@@ -19,11 +18,7 @@ use gem_sui::{
         into_balance, move_call,
     },
 };
-use std::{
-    collections::HashMap,
-    fmt::{Debug, Display},
-    str::FromStr,
-};
+use std::{collections::HashMap, fmt::Display, str::FromStr};
 use sui_transaction_builder::{Argument, ObjectInput, TransactionBuilder};
 use sui_types::{Address, Digest};
 
@@ -43,8 +38,8 @@ impl BuildInput<'_> {
     }
 }
 
-pub(super) async fn build_quote_data<C: Client + Clone + Send + Sync + Debug + 'static>(
-    client: &SuiClient<C>,
+pub(super) async fn build_quote_data(
+    client: &SuiClient,
     quote: &Quote,
     route: &PoolRoute,
     referral_fee: &ReferralFee,

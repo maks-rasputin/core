@@ -2,7 +2,7 @@ use std::error::Error;
 
 use gem_encoding::encode_base64;
 use num_bigint::BigInt;
-use primitives::{FeePriority, FeeRate, GasPriceType, StakeType, TransactionInputType, TransactionLoadInput, TransactionLoadMetadata};
+use primitives::{FeePriority, FeeRate, GasPriceType, StakeType, TransactionInputType, TransactionLoadInput};
 
 use crate::{encode_split_and_stake, encode_token_transfer, encode_transfer, encode_unstake, models::*, validate_and_hash};
 
@@ -26,10 +26,6 @@ impl From<SuiCoin> for crate::models::Coin {
             },
         }
     }
-}
-
-pub fn map_preload_metadata(_coins: Vec<SuiCoin>) -> Result<TransactionLoadMetadata, Box<dyn Error + Send + Sync>> {
-    Ok(TransactionLoadMetadata::Sui { message_bytes: "".to_string() })
 }
 
 pub fn map_transaction_data(

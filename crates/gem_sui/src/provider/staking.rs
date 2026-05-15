@@ -4,8 +4,6 @@ use std::error::Error;
 use async_trait::async_trait;
 #[cfg(feature = "rpc")]
 use chain_traits::ChainStaking;
-#[cfg(feature = "rpc")]
-use gem_client::Client;
 use primitives::{DelegationBase, DelegationValidator};
 
 use crate::provider::staking_mapper;
@@ -13,7 +11,7 @@ use crate::rpc::client::SuiClient;
 
 #[cfg(feature = "rpc")]
 #[async_trait]
-impl<C: Client + Clone> ChainStaking for SuiClient<C> {
+impl ChainStaking for SuiClient {
     async fn get_staking_apy(&self) -> Result<Option<f64>, Box<dyn Error + Sync + Send>> {
         let validators = self.get_validators().await?;
         let apy = staking_mapper::map_staking_apy(validators)?;

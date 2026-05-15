@@ -32,19 +32,6 @@ pub struct SuiStatus {
 pub struct SuiEffects {
     pub gas_used: GasUsed,
     pub status: SuiStatus,
-    pub created: Option<Vec<SuiObjectChange>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SuiObjectChange {
-    pub reference: SuiObjectReference,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SuiObjectReference {
-    pub object_id: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -72,14 +59,6 @@ impl GasUsed {
 pub use TransactionBroadcast as SuiBroadcastTransaction;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TransactionQueryResult {
-    pub data: Vec<SuiTransaction>,
-    pub has_next_page: bool,
-    pub next_cursor: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransactionBroadcast {
     pub digest: String,
 }
@@ -89,14 +68,6 @@ pub struct TransactionBroadcast {
 pub struct TransactionBlocks {
     pub data: Vec<Digest>,
 }
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResultData<T> {
-    pub data: T,
-}
-
-#[cfg(feature = "rpc")]
-pub type Digests = ResultData<Vec<Digest>>;
 
 #[cfg(feature = "rpc")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
