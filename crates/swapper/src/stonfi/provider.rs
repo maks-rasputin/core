@@ -200,42 +200,50 @@ where
 
     async fn discover_and_quote(&self, from_token: &str, to_token: &str, amount: &BigUint, slippage_bps: u32, require_v2: bool) -> Result<SwapSimulation, SwapperError> {
         let (_, explored) = self.route_cache.get(from_token, to_token);
-        let mut error = SwapperError::NoQuoteAvailable;
-        for router in FALLBACK_ROUTERS
+        let routers = FALLBACK_ROUTERS
             .iter()
             .filter(|router| !require_v2 || router.is_supported_v2())
             .filter(|router| !explored.iter().any(|address| address == router.address))
-        {
-            let router_addresses = [router.address.to_string()];
-            let candidate = match self.discover_candidate(from_token, to_token, router).await {
+            .collect::<Vec<_>>();
+        let explored_addresses = routers.iter().map(|router| router.address.to_string()).collect::<Vec<_>>();
+        let discoveries = join_all(routers.iter().map(|router| self.discover_candidate(from_token, to_token, router))).await;
+        let mut candidates = Vec::new();
+        let mut error = SwapperError::NoQuoteAvailable;
+
+        for discovery in discoveries {
+            let candidate = match discovery {
                 Ok(candidate) => candidate,
                 Err(err) if is_retryable_get_method_error(&err) => return Err(err),
                 Err(err) => {
-                    self.route_cache.put(from_token, to_token, &[], &router_addresses);
                     error = err;
                     continue;
                 }
             };
 
-            match self.quote_best_candidate(vec![candidate], from_token, to_token, amount, slippage_bps).await {
-                Ok((pool, simulation)) => {
-                    self.route_cache.put(from_token, to_token, std::slice::from_ref(&pool), &router_addresses);
-                    self.route_cache.put_route(from_token, to_token, std::slice::from_ref(&pool));
-                    return Ok(simulation);
-                }
-                Err(err) if is_retryable_get_method_error(&err) => return Err(err),
-                Err(err) => {
-                    self.route_cache.put(from_token, to_token, &[], &router_addresses);
-                    error = err;
-                }
+            candidates.push(candidate);
+        }
+
+        if candidates.is_empty() {
+            self.route_cache.put(from_token, to_token, &[], &explored_addresses);
+            return Err(error);
+        }
+
+        match self.quote_best_candidate(candidates.clone(), from_token, to_token, amount, slippage_bps).await {
+            Ok((pool, simulation)) => {
+                self.route_cache.put(from_token, to_token, &candidates, &explored_addresses);
+                self.route_cache.put_route(from_token, to_token, std::slice::from_ref(&pool));
+                Ok(simulation)
+            }
+            Err(err) if is_retryable_get_method_error(&err) => Err(err),
+            Err(err) => {
+                self.route_cache.put(from_token, to_token, &candidates, &explored_addresses);
+                Err(err)
             }
         }
-        Err(error)
     }
 
     async fn discover_candidate(&self, from_token: &str, to_token: &str, router: &RouterInfo) -> Result<DiscoveredPool, SwapperError> {
-        let wallet0 = self.client.router_jetton_wallet(router, from_token).await?;
-        let wallet1 = self.client.router_jetton_wallet(router, to_token).await?;
+        let (wallet0, wallet1) = futures::try_join!(self.client.router_jetton_wallet(router, from_token), self.client.router_jetton_wallet(router, to_token))?;
         let pool_address = self.client.get_pool_address(router, &wallet0, &wallet1).await?;
         Ok(DiscoveredPool {
             pool_address,
@@ -517,6 +525,7 @@ mod tests {
 
     const PTON_WALLET: &str = "EQCSIMGBps_qzRG3uPYhON8bucyCtu0mYdL1-u4gSz77IBa3";
     const USDT_WALLET: &str = "EQCSLWJ9fY7b0A5OI72wxUp27l4fRlc6GvRBeFf6PiPpH4p3";
+    const GRAM_TOKEN_ID: &str = "EQC47093oX5Xhb0xuk2lCr2RhS8rj-vul61u4W2UH5ORmG_O";
     const DISCOVERED_POOL: &str = "EQCGScrZe1xbyWqWDvdI6mzP-GAcAWFv6ZXuaJOuSqemxku4";
     const V1_POOL: &str = "EQD8TJ8xEWB1SpnRE4d89YO3jl0W0EiBnNS4IBaHaUmdfizE";
 
@@ -592,15 +601,23 @@ mod tests {
         STATIC_POOLS.iter().find(|pool| pool.pool_address == V1_POOL).unwrap()
     }
 
-    fn provider_with_pool_data<F>(handler: F) -> Stonfi<gem_client::testkit::MockClient>
+    fn provider_with_get_method<F>(handler: F) -> Stonfi<gem_client::testkit::MockClient>
     where
-        F: Fn(&str) -> Vec<u8> + Send + Sync + 'static,
+        F: Fn(&str, &str) -> Vec<u8> + Send + Sync + 'static,
     {
         Stonfi::new_with_client(TonClient::new(gem_client::testkit::MockClient::new().with_post(move |_, body| {
             let request: serde_json::Value = serde_json::from_slice(body).unwrap();
             let address = request["address"].as_str().unwrap();
-            Ok(handler(address))
+            let method = request["method"].as_str().unwrap();
+            Ok(handler(method, address))
         })))
+    }
+
+    fn provider_with_pool_data<F>(handler: F) -> Stonfi<gem_client::testkit::MockClient>
+    where
+        F: Fn(&str) -> Vec<u8> + Send + Sync + 'static,
+    {
+        provider_with_get_method(move |_, address| handler(address))
     }
 
     #[tokio::test]
@@ -608,12 +625,9 @@ mod tests {
         let not_pool = not_ton_pool();
         let calls = Arc::new(Mutex::new(Vec::<String>::new()));
         let calls_ref = calls.clone();
-        let provider = Stonfi::new_with_client(TonClient::new(gem_client::testkit::MockClient::new().with_post(move |_, body| {
-            let request: serde_json::Value = serde_json::from_slice(body).unwrap();
-            let address = request["address"].as_str().unwrap();
-            let method = request["method"].as_str().unwrap();
+        let provider = provider_with_get_method(move |method, address| {
             calls_ref.lock().unwrap().push(method.to_string());
-            Ok(match method {
+            match method {
                 "get_wallet_address" => cell_response(USDT_WALLET),
                 "get_pool_address" => cell_response(DISCOVERED_POOL),
                 "get_pool_data" if address == DISCOVERED_POOL => get_pool_data_response(false, 3_000_000_000_000, 1_800_000_000_000_000, USDT_WALLET, PTON_WALLET, 7),
@@ -621,8 +635,8 @@ mod tests {
                     get_pool_data_response(false, 5_000_000_000_000_000, 2_000_000_000_000, not_pool.token0_wallet, not_pool.token1_wallet, 20)
                 }
                 _ => unreachable!("{method} {address}"),
-            })
-        })));
+            }
+        });
         let request = QuoteRequest {
             from_asset: SwapperQuoteAsset::from(AssetId::from_token(Chain::Ton, "unknown-token")),
             to_asset: SwapperQuoteAsset::from(AssetId::from_token(Chain::Ton, not_pool.token0)),
@@ -683,6 +697,43 @@ mod tests {
         assert_eq!(simulation.router.major_version, 1);
         assert_eq!(simulation.offer_jetton_wallet, v1_pool.token0_wallet);
         assert_eq!(simulation.ask_jetton_wallet, v1_pool.token1_wallet);
+    }
+
+    #[tokio::test]
+    async fn test_discovered_direct_quote_selects_best_router_pool() {
+        let calls = Arc::new(Mutex::new(Vec::<String>::new()));
+        let calls_ref = calls.clone();
+        let provider = provider_with_get_method(move |method, address| {
+            calls_ref.lock().unwrap().push(format!("{method} {address}"));
+            match method {
+                "get_wallet_address" if address == TON_USDT_TOKEN_ID => cell_response(USDT_WALLET),
+                "get_wallet_address" if address == GRAM_TOKEN_ID => cell_response(PTON_WALLET),
+                "get_pool_address" if address == FALLBACK_ROUTERS[0].address => cell_response(DISCOVERED_POOL),
+                "get_pool_address" if address == FALLBACK_ROUTERS[1].address => cell_response(V1_POOL),
+                "get_pool_data" if address == DISCOVERED_POOL => get_pool_data_response(false, 1, 19_811_277, USDT_WALLET, PTON_WALLET, 20),
+                "get_pool_data" if address == V1_POOL => get_v1_pool_data_response(226_348_366, 194_933_327_038_860, USDT_WALLET, PTON_WALLET, 20),
+                _ => unreachable!("{method} {address}"),
+            }
+        });
+        let request = QuoteRequest {
+            from_asset: SwapperQuoteAsset::from(AssetId::from_token(Chain::Ton, TON_USDT_TOKEN_ID)),
+            to_asset: SwapperQuoteAsset::from(AssetId::from_token(Chain::Ton, GRAM_TOKEN_ID)),
+            wallet_address: TEST_TON_SENDER.to_string(),
+            destination_address: TEST_TON_SENDER.to_string(),
+            value: "233000".to_string(),
+            options: Options::new_with_slippage(100.into()),
+        };
+
+        let path = provider.quote_direct(&request, &request.value, true).await.unwrap();
+        let simulation: SwapSimulation = serde_json::from_str(&path.routes[0].route_data).unwrap();
+        let mut pool_calls = calls.lock().unwrap().iter().filter(|call| call.starts_with("get_pool_data ")).cloned().collect::<Vec<_>>();
+        pool_calls.sort();
+        let mut expected_pool_calls = vec![format!("get_pool_data {DISCOVERED_POOL}"), format!("get_pool_data {V1_POOL}")];
+        expected_pool_calls.sort();
+
+        assert_eq!(pool_calls, expected_pool_calls);
+        assert_eq!(simulation.router.major_version, 1);
+        assert_eq!(simulation.ask_units, "199854680472");
     }
 
     #[tokio::test]
