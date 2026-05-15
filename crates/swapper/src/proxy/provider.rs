@@ -109,10 +109,6 @@ impl ProxyProvider<RpcClient> {
         Self::new_with_client(provider, client, assets, rpc_provider)
     }
 
-    pub fn new_stonfi_v2(rpc_provider: Arc<dyn RpcProvider>) -> Self {
-        Self::new_with_path(SwapperProvider::StonfiV2, "stonfi_v2", vec![SwapperChainAsset::All(Chain::Ton)], rpc_provider)
-    }
-
     pub fn new_okx(rpc_provider: Arc<dyn RpcProvider>) -> Self {
         Self::new_with_path(
             SwapperProvider::Okx,

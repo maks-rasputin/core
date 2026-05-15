@@ -2,14 +2,13 @@ use std::error::Error;
 
 use primitives::{Asset, AssetId, AssetType, chain::Chain};
 use serde::Serialize;
-use serde_json;
 
 use chain_traits::{ChainAccount, ChainAddressStatus, ChainPerpetual, ChainStaking, ChainTraits};
 use gem_client::{Client, ClientExt, build_path_with_query};
 
 use crate::models::{
-    ApiResult, BroadcastTransaction, Chainhead, JettonInfo, JettonOffchainMetadata, JettonWalletsResponse, NftCollectionsResponse, NftItemsResponse, SimpleJettonBalance,
-    TraceByAddressQuery, TraceByBlockQuery, TraceByMessageQuery, TraceByTransactionQuery, TraceResponse, WalletInfo,
+    ApiResult, BroadcastTransaction, Chainhead, JettonInfo, JettonOffchainMetadata, JettonWalletsResponse, NftCollectionsResponse, NftItemsResponse, RunGetMethodRequest,
+    RunGetMethodResult, SimpleJettonBalance, StackArg, TraceByAddressQuery, TraceByBlockQuery, TraceByMessageQuery, TraceByTransactionQuery, TraceResponse, WalletInfo,
 };
 
 const TONCENTER_V3_BLOCK_LIMIT: usize = 100;
@@ -55,6 +54,23 @@ impl<C: Client> TonClient<C> {
     pub async fn broadcast_transaction(&self, data: String) -> Result<ApiResult<BroadcastTransaction>, Box<dyn Error + Send + Sync>> {
         let body = serde_json::json!({ "boc": data });
         Ok(self.client.post("/api/v2/sendBocReturnHash", &body).await?)
+    }
+
+    pub async fn run_get_method(&self, address: &str, method: &str, stack: Vec<StackArg>) -> Result<RunGetMethodResult, Box<dyn Error + Send + Sync>> {
+        let request = RunGetMethodRequest {
+            address: address.to_string(),
+            method: method.to_string(),
+            stack,
+        };
+        let response: ApiResult<serde_json::Value> = self.client.post("/api/v2/runGetMethod", &request).await?;
+        if !response.ok {
+            let message = match response.result.as_str() {
+                Some(message) => message.to_string(),
+                None => response.result.to_string(),
+            };
+            return Err(format!("TON runGetMethod failed: {message}").into());
+        }
+        Ok(serde_json::from_value(response.result)?)
     }
 
     pub async fn get_traces_by_message(&self, hash: String) -> Result<TraceResponse, Box<dyn Error + Send + Sync>> {

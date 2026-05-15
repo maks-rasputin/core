@@ -170,7 +170,7 @@ impl CetusClmm {
         if !known.is_empty() {
             return known;
         }
-        let (cached_pools, explored) = self.pool_cache.get(from, to).unwrap_or_default();
+        let (cached_pools, explored) = self.pool_cache.get(from, to);
         let missing: Vec<u32> = ticks.iter().filter(|t| !explored.contains(t)).copied().collect();
         if missing.is_empty() {
             return cached_pools;
@@ -179,7 +179,7 @@ impl CetusClmm {
             return cached_pools;
         };
         self.pool_cache.put(from, to, &new_pools, &missing);
-        self.pool_cache.get(from, to).map(|(pools, _)| pools).unwrap_or_default()
+        self.pool_cache.get(from, to).0
     }
 
     async fn query_direct_pools(&self, from: &str, to: &str, ticks: &[u32]) -> Option<Vec<DiscoveredPool>> {

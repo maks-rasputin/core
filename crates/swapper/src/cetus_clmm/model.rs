@@ -81,7 +81,7 @@ impl PoolRoute {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub(super) struct DiscoveredPool {
     pub pool_id: String,
     pub pool_init_version: u64,

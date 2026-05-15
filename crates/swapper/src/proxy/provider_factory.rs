@@ -3,10 +3,6 @@ use std::sync::Arc;
 
 use super::provider::ProxyProvider;
 
-pub fn new_stonfi_v2(rpc_provider: Arc<dyn RpcProvider>) -> ProxyProvider<RpcClient> {
-    ProxyProvider::new_stonfi_v2(rpc_provider)
-}
-
 pub fn new_okx(rpc_provider: Arc<dyn RpcProvider>) -> ProxyProvider<RpcClient> {
     ProxyProvider::new_okx(rpc_provider)
 }

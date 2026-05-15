@@ -2,16 +2,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::Route;
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct SimulateSwapRequest {
-    pub offer_address: String,
-    pub units: String,
-    pub ask_address: String,
-    pub slippage_tolerance: String,
-    pub referral_address: String,
-    pub referral_fee_bps: String,
-}
-
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SwapSimulation {
     pub offer_jetton_wallet: String,
@@ -30,7 +20,7 @@ pub struct Router {
 
 impl Router {
     pub(super) fn is_supported_v2(&self) -> bool {
-        self.major_version == 2 && matches!(self.minor_version, 1 | 2)
+        self.major_version == 2 && (self.minor_version == 1 || self.minor_version == 2)
     }
 }
 

@@ -5,6 +5,9 @@ use crc::Crc;
 use gem_encoding::{decode_base64_no_pad, decode_base64_url, encode_base64_url};
 use primitives::{Address as AddressTrait, AddressError, SignerError};
 
+#[cfg(feature = "tvm")]
+use crate::tvm::{BagOfCells, BitReader, Cell, CellBuilder, TvmError};
+
 type Workchain = i32;
 type HashPart = [u8; 32];
 type RawBytes = [u8; 33];
@@ -71,6 +74,46 @@ impl Address {
             return Err(SignerError::invalid_input("TON from does not match signer address"));
         }
         Ok(())
+    }
+
+    #[cfg(feature = "tvm")]
+    pub fn to_cell(&self) -> Result<Cell, TvmError> {
+        let mut builder = CellBuilder::new();
+        builder.store_address(self)?;
+        builder.build()
+    }
+
+    #[cfg(feature = "tvm")]
+    pub fn to_boc_base64(&self) -> Result<String, TvmError> {
+        BagOfCells::from_root(self.to_cell()?).to_base64(true)
+    }
+
+    #[cfg(feature = "tvm")]
+    pub fn from_cell(cell: &Cell) -> Result<Self, TvmError> {
+        let mut reader = BitReader::from_bits(&cell.data, cell.bit_len)?;
+        let tag = reader.read_uint(2)?;
+        if tag == 0 {
+            return Err(TvmError::new("address cell contains null address"));
+        }
+        if tag != 0b10 {
+            return Err(TvmError::new("address cell must contain std address"));
+        }
+        if reader.read_bit()? {
+            return Err(TvmError::new("anycast addresses are not supported"));
+        }
+
+        let workchain = reader.read_u8()? as i8 as i32;
+        let mut hash_part = [0u8; 32];
+        for byte in &mut hash_part {
+            *byte = reader.read_u8()?;
+        }
+        Ok(Self::new(workchain, hash_part))
+    }
+
+    #[cfg(feature = "tvm")]
+    pub fn from_boc_base64(value: &str) -> Result<Self, TvmError> {
+        let root = BagOfCells::parse_base64_root(value)?;
+        Self::from_cell(root.as_ref())
     }
 
     fn encode_user_friendly(&self, flag: u8) -> String {
@@ -207,5 +250,14 @@ mod tests {
         let decoded_hex = base64_to_hex_address(&base64).unwrap();
 
         assert_eq!(original_hex, decoded_hex);
+    }
+
+    #[cfg(feature = "tvm")]
+    #[test]
+    fn test_address_cell_roundtrip() {
+        let address = Address::parse("EQCSLWJ9fY7b0A5OI72wxUp27l4fRlc6GvRBeFf6PiPpH4p3").unwrap();
+        let boc = address.to_boc_base64().unwrap();
+
+        assert_eq!(Address::from_boc_base64(&boc).unwrap(), address);
     }
 }
