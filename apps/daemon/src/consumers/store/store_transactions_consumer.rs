@@ -13,7 +13,7 @@ use crate::pusher::Pusher;
 
 const TRANSACTION_BATCH_SIZE: usize = 100;
 
-const IN_TRANSIT_TYPES: [TransactionType; 2] = [TransactionType::Transfer, TransactionType::SmartContractCall];
+const CROSS_CHAIN_SOURCE_TYPES: [TransactionType; 3] = [TransactionType::Transfer, TransactionType::SmartContractCall, TransactionType::Swap];
 
 pub struct StoreTransactionsConsumer {
     pub database: Database,
@@ -205,7 +205,7 @@ impl StoreTransactionsConsumer {
                 }
 
                 if transaction.state == TransactionState::Confirmed
-                    && IN_TRANSIT_TYPES.contains(&transaction.transaction_type)
+                    && CROSS_CHAIN_SOURCE_TYPES.contains(&transaction.transaction_type)
                     && cross_chain::is_cross_chain_swap(&transaction, deposit_addresses)
                 {
                     transaction.state = TransactionState::InTransit;
@@ -304,6 +304,16 @@ mod tests {
         assert_eq!(
             StoreTransactionsConsumer::transactions_for_storage(vec![swap_type], &DepositAddressMap::new(), &SendAddressMap::new())[0].state,
             TransactionState::Confirmed
+        );
+
+        let cross_chain_swap_type = Transaction {
+            transaction_type: TransactionType::Swap,
+            to: near_vault.clone(),
+            ..Transaction::mock()
+        };
+        assert_eq!(
+            StoreTransactionsConsumer::transactions_for_storage(vec![cross_chain_swap_type], &deposit_addresses, &SendAddressMap::new())[0].state,
+            TransactionState::InTransit
         );
 
         let token_approval = Transaction {
