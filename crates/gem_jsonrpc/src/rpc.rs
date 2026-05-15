@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use gem_client::{Client, ClientError, ContentType, Response, decode_json_byte_array, deserialize_response};
+use gem_client::{Client, ClientError, ContentType, Response, X_CACHE_TTL, decode_json_byte_array, deserialize_response};
 use primitives::Chain;
 use serde::{Serialize, de::DeserializeOwned};
 use std::{
@@ -46,12 +46,7 @@ impl Target {
     }
 
     pub fn set_cache_ttl(mut self, ttl: u64) -> Self {
-        if self.headers.is_none() {
-            self.headers = Some(HashMap::new());
-        }
-        if let Some(headers) = self.headers.as_mut() {
-            headers.insert(gem_client::X_CACHE_TTL.into(), ttl.to_string());
-        }
+        self.headers.get_or_insert_with(HashMap::new).insert(X_CACHE_TTL.into(), ttl.to_string());
         self
     }
 }

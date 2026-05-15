@@ -89,10 +89,7 @@ where
             .run_get_method(address, method, stack)
             .await
             .map_err(|err| SwapperError::ComputeQuoteError(err.to_string()))?;
-        if result.exit_code != 0 {
-            return Err(SwapperError::ComputeQuoteError(format!("TON get-method {method} exit code {}", result.exit_code)));
-        }
-        Ok(result)
+        validate_run_get_method(method, result)
     }
 
     async fn run_static_get_method(&self, address: &str, method: &str, stack: Vec<StackArg>) -> Result<RunGetMethodResult, SwapperError> {
@@ -101,11 +98,15 @@ where
             .run_get_method_with_headers(address, method, stack, static_read_cache_headers())
             .await
             .map_err(|err| SwapperError::ComputeQuoteError(err.to_string()))?;
-        if result.exit_code != 0 {
-            return Err(SwapperError::ComputeQuoteError(format!("TON get-method {method} exit code {}", result.exit_code)));
-        }
-        Ok(result)
+        validate_run_get_method(method, result)
     }
+}
+
+fn validate_run_get_method(method: &str, result: RunGetMethodResult) -> Result<RunGetMethodResult, SwapperError> {
+    if result.exit_code != 0 {
+        return Err(SwapperError::ComputeQuoteError(format!("TON get-method {method} exit code {}", result.exit_code)));
+    }
+    Ok(result)
 }
 
 fn parse_pool_data(result: &RunGetMethodResult) -> Result<PoolData, SwapperError> {
