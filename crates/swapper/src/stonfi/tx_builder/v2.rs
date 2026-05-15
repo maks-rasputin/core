@@ -87,7 +87,6 @@ fn build_swap_body(params: &SwapTransactionParams<'_>) -> Result<Cell, SwapperEr
         .map(|next_swap| build_next_swap_body(params, next_swap))
         .transpose()?
         .map(Cell::into_arc);
-    let custom_payload_forward_gas = next_swap_forward_gas(params);
 
     build_swap_cell(SwapCellParams {
         opcode: V2_SWAP_OPCODE,
@@ -95,7 +94,7 @@ fn build_swap_body(params: &SwapTransactionParams<'_>) -> Result<Cell, SwapperEr
         refund_address: params.wallet_address,
         receiver_address,
         min_ask_amount,
-        forward_gas: custom_payload_forward_gas,
+        forward_gas: next_swap_forward_gas(params),
         next_payload: next_payload.as_ref(),
         referral_bps,
         referral_address: params.referral.address,
@@ -247,13 +246,13 @@ mod tests {
         );
         assert!(BagOfCells::parse_base64(&cross_transaction.data).is_ok());
 
-        let swap_from_intermediary_with_minor_mismatch = simulation_with_router(
-            &swap_from_intermediary,
-            Router {
+        let swap_from_intermediary_with_minor_mismatch = SwapSimulation {
+            router: Router {
                 minor_version: 1,
                 ..swap_from_intermediary.router.clone()
             },
-        );
+            ..swap_from_intermediary.clone()
+        };
         let cross_transaction_with_minor_mismatch = build_swap_transaction(SwapTransactionParams {
             next_swap: Some(NextSwapParams {
                 simulation: &swap_from_intermediary_with_minor_mismatch,
@@ -266,13 +265,13 @@ mod tests {
         assert_eq!(cross_transaction_with_minor_mismatch.value, cross_transaction.value);
         assert_eq!(cross_transaction_with_minor_mismatch.data, cross_transaction.data);
 
-        let swap_from_intermediary_on_other_router = simulation_with_router(
-            &swap_from_intermediary,
-            Router {
+        let swap_from_intermediary_on_other_router = SwapSimulation {
+            router: Router {
                 address: "EQDx--jUU9PUtHltPYZX7wdzIi0SPY3KZ8nvOs0iZvQJd6Ql".to_string(),
                 ..swap_from_intermediary.router.clone()
             },
-        );
+            ..swap_from_intermediary.clone()
+        };
         let forward_transaction = build_swap_transaction(SwapTransactionParams {
             next_swap: Some(NextSwapParams {
                 simulation: &swap_from_intermediary_on_other_router,
@@ -292,9 +291,5 @@ mod tests {
             "te6cckECBQEAAd4AAa4Pin6lAAAAAAAAAAAw9CQIASXCgjXKjRJeZ2WRUT1SByGx/pn3ci9Mh3I85+4N+3OjAAzoUpalAaXnVm5MoiYWRZguLFzY0KxFjLv3MkRq5BXzyDk4cAEBAeFmZN4qgBJFrE+vsdt6AcnEd7YYqU7dy8PoyudDXogvCv9HxH0j8ADOhSlqUBpedWbkyiJhZFmC4sXNjQrEWMu/cyRGrkFfPgAZ0KUtSgNLzqzcmURMLIswXFi5saFYixl37mSI1cgr54AAAAAyqfiAQAIBmzA+5jgBJFrE+vsdt6AcnEd7YYqU7dy8PoyudDXogvCv9HxH0j6BycOAEAAAQAM6FKWpQGl51ZuTKImFkWYLixc2NCsRYy79zJEauQV8+AMB4WZk3iqAEkQYMDTZ/VmiNvcexCcb43c5kFbdpMw6Xr9dxAln32QQAM6FKWpQGl51ZuTKImFkWYLixc2NCsRYy79zJEauQV8+ABnQpS1KA0vOrNyZREwsizBcWLmxoViLGXfuZIjVyCvngAAAADKp+IBABACRICtoAGdClLUoDS86s3JlETCyLMFxYubGhWIsZd+5kiNXIK+eAAAZQAM6FKWpQGl51ZuTKImFkWYLixc2NCsRYy79zJEauQV8+Jp8zgc="
         );
         assert!(BagOfCells::parse_base64(&forward_transaction.data).is_ok());
-    }
-
-    fn simulation_with_router(simulation: &SwapSimulation, router: Router) -> SwapSimulation {
-        SwapSimulation { router, ..simulation.clone() }
     }
 }
