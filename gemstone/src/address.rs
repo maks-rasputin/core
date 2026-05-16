@@ -1,7 +1,8 @@
+use std::sync::Arc;
+
 use crate::GemstoneError;
 use gem_bitcoin::models::address::Address as BitcoinAddress;
 use primitives::{Chain, ChainAddress, ChainType};
-use std::sync::Arc;
 
 #[derive(uniffi::Object)]
 pub struct GemChainAddress {
@@ -41,7 +42,8 @@ pub fn validate_address(address: &str, chain: Chain) -> bool {
         ChainType::Stellar => gem_stellar::validate_address(address),
         ChainType::Algorand => gem_algorand::validate_address(address),
         ChainType::Xrp => gem_xrp::validate_address(address),
-        ChainType::Bitcoin | ChainType::Polkadot | ChainType::Cardano => false,
+        ChainType::Polkadot => gem_polkadot::validate_address(address),
+        ChainType::Bitcoin | ChainType::Cardano => false,
     }
 }
 
@@ -64,6 +66,9 @@ mod tests {
         assert!(validate_address("cosmos1h3laqcrmul79zwtw6j63ncsl0adfj07wgupylj", Chain::Cosmos));
         assert!(validate_address("GvhwZwtV32kYUXUw965CUM3KGPdtBsDwPVpi92brY5R2", Chain::Solana));
         assert!(validate_address("rnBFvgZphmN39GWzUJeUitaP22Fr9be75H", Chain::Xrp));
+        assert!(!validate_address("rnBFvgZphmN39GWzUJeUitaP22Fr9be75J", Chain::Xrp));
+        assert!(validate_address("15e6w4u9nH4Tb9HdJco2Zua4y5DpHb1hHXBKBGkUrLMTpuXo", Chain::Polkadot));
+        assert!(!validate_address("15e6w4u9nH4Tb9HdJco2Zua4y5DpHb1hHXBKBGkUrLMTpuXj", Chain::Polkadot));
     }
 
     #[test]

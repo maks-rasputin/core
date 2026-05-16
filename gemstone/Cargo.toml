@@ -39,7 +39,7 @@ gem_algorand = { path = "../crates/gem_algorand", features = ["rpc", "signer"] }
 gem_stellar = { path = "../crates/gem_stellar", features = ["rpc", "signer"] }
 gem_xrp = { path = "../crates/gem_xrp", features = ["rpc", "signer"] }
 gem_near = { path = "../crates/gem_near", features = ["rpc", "signer"] }
-gem_polkadot = { path = "../crates/gem_polkadot", features = ["rpc"] }
+gem_polkadot = { path = "../crates/gem_polkadot", features = ["rpc", "signer"] }
 gem_wallet_connect = { path = "../crates/gem_wallet_connect" }
 chain_traits = { path = "../crates/chain_traits" }
 signer = { path = "../crates/signer" }
