@@ -1,4 +1,4 @@
-use primitives::{Address, SignerError, TransactionLoadInput, TransactionLoadMetadata};
+use primitives::{SignerError, TransactionLoadInput, TransactionLoadMetadata};
 use signer::Ed25519KeyPair;
 
 use crate::address::PolkadotAddress;
@@ -39,7 +39,7 @@ pub(crate) struct NativeTransferTransaction {
 impl NativeTransferTransaction {
     pub(crate) fn from_input(input: &TransactionLoadInput, signer_account_id: [u8; 32]) -> Result<Self, SignerError> {
         let parameters = NativeTransferParameters::from_input(input)?;
-        let destination = parse_address(&input.destination_address)?;
+        let destination = PolkadotAddress::parse(&input.destination_address)?;
         let value = input.value.parse::<u128>().map_err(SignerError::from_display)?;
         let uses_multi_address = parameters.uses_multi_address();
 
@@ -132,10 +132,6 @@ impl NativeTransferParameters {
         }
         extra
     }
-}
-
-fn parse_address(address: &str) -> Result<PolkadotAddress, SignerError> {
-    PolkadotAddress::try_parse(address).ok_or_else(|| SignerError::invalid_input("invalid Polkadot address"))
 }
 
 fn checks_metadata(spec_version: u32) -> bool {

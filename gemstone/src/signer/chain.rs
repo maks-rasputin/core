@@ -1,6 +1,7 @@
 use crate::{GemstoneError, models::transaction::GemSignerInput};
 use gem_algorand::AlgorandChainSigner;
 use gem_aptos::AptosChainSigner;
+use gem_cardano::signer::CardanoChainSigner;
 use gem_cosmos::signer::CosmosChainSigner;
 use gem_evm::signer::EvmChainSigner;
 use gem_hypercore::signer::HyperCoreSigner;
@@ -38,6 +39,7 @@ impl GemChainSigner {
             ChainType::Stellar => Box::new(StellarChainSigner),
             ChainType::Xrp => Box::new(XrpChainSigner),
             ChainType::Polkadot => Box::new(PolkadotChainSigner),
+            ChainType::Cardano => Box::new(CardanoChainSigner),
             _ => todo!("Signer not implemented for chain {:?}", chain),
         };
 

@@ -1,6 +1,6 @@
 use std::fmt;
 
-use primitives::Address;
+use primitives::{Address, SignerError};
 
 const POLKADOT_PREFIX: u8 = 0;
 const ADDRESS_DATA_LENGTH: usize = 32;
@@ -45,6 +45,10 @@ impl Address for PolkadotAddress {
 }
 
 impl PolkadotAddress {
+    pub(crate) fn parse(value: &str) -> Result<Self, SignerError> {
+        Self::try_parse(value).ok_or_else(|| SignerError::invalid_input("invalid Polkadot address"))
+    }
+
     pub(crate) fn account_id(&self) -> &[u8; ADDRESS_DATA_LENGTH] {
         &self.0
     }

@@ -1,4 +1,4 @@
-use primitives::{Address, ChainSigner, SignerError, SignerInput, TransactionLoadInput};
+use primitives::{ChainSigner, SignerError, SignerInput, TransactionLoadInput};
 use signer::Ed25519KeyPair;
 
 use crate::address::PolkadotAddress;
@@ -8,7 +8,6 @@ use crate::transfer::NativeTransferTransaction;
 pub struct PolkadotChainSigner;
 
 impl ChainSigner for PolkadotChainSigner {
-    // Native DOT transfer_allow_death is the only Polkadot signing flow currently migrated from mobile.
     fn sign_transfer(&self, input: &SignerInput, private_key: &[u8]) -> Result<String, SignerError> {
         Self::sign_transaction(&input.input, private_key)
     }
@@ -17,7 +16,7 @@ impl ChainSigner for PolkadotChainSigner {
 impl PolkadotChainSigner {
     fn sign_transaction(input: &TransactionLoadInput, private_key: &[u8]) -> Result<String, SignerError> {
         let key_pair = Ed25519KeyPair::from_private_key(private_key)?;
-        let sender = PolkadotAddress::try_parse(&input.sender_address).ok_or_else(|| SignerError::invalid_input("invalid Polkadot address"))?;
+        let sender = PolkadotAddress::parse(&input.sender_address)?;
         if sender.account_id() != &key_pair.public_key_bytes {
             return SignerError::invalid_input_err("Polkadot sender address does not match private key");
         }

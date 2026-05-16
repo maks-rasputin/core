@@ -3168,16 +3168,25 @@ name = "gem_cardano"
 version = "1.0.0"
 dependencies = [
  "async-trait",
+ "bech32",
  "chain_traits",
  "chrono",
+ "curve25519-dalek",
+ "futures",
  "gem_client",
+ "gem_hash",
+ "hex",
  "num-bigint",
+ "num-traits",
  "primitives",
  "reqwest 0.13.2",
  "serde",
  "serde_json",
+ "serde_serializers",
  "settings",
+ "sha2 0.11.0",
  "tokio",
+ "zeroize",
 ]
 
 [[package]]
