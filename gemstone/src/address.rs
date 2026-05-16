@@ -40,7 +40,8 @@ pub fn validate_address(address: &str, chain: Chain) -> bool {
         ChainType::Near => gem_near::validate_address(address),
         ChainType::Stellar => gem_stellar::validate_address(address),
         ChainType::Algorand => gem_algorand::validate_address(address),
-        ChainType::Bitcoin | ChainType::Xrp | ChainType::Polkadot | ChainType::Cardano => false,
+        ChainType::Xrp => gem_xrp::validate_address(address),
+        ChainType::Bitcoin | ChainType::Polkadot | ChainType::Cardano => false,
     }
 }
 
@@ -62,6 +63,7 @@ mod tests {
         assert!(!validate_address("0X5615e8ab93b9d695b6d4d6545f7792aa59e1069a", Chain::Ethereum));
         assert!(validate_address("cosmos1h3laqcrmul79zwtw6j63ncsl0adfj07wgupylj", Chain::Cosmos));
         assert!(validate_address("GvhwZwtV32kYUXUw965CUM3KGPdtBsDwPVpi92brY5R2", Chain::Solana));
+        assert!(validate_address("rnBFvgZphmN39GWzUJeUitaP22Fr9be75H", Chain::Xrp));
     }
 
     #[test]
