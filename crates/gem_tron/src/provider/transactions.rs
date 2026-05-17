@@ -37,7 +37,7 @@ impl<C: Client + Clone> ChainTransactions for TronClient<C> {
             return Ok(vec![]);
         }
 
-        let futures = transactions.iter().map(|tx| self.get_transaction_reciept(tx.tx_id.clone()));
+        let futures = transactions.iter().map(|transaction| self.get_transaction_reciept(transaction.transaction_id.clone()));
         let receipts = futures::future::try_join_all(futures).await?;
 
         Ok(map_transactions_by_address(transactions, receipts))
@@ -58,12 +58,10 @@ mod chain_integration_tests {
         let block_number = latest_block - 25;
         let transactions = tron_client.get_transactions_by_block(block_number).await.unwrap();
 
-        println!("Latest block: {}, test block: {}, transactions count: {}", latest_block, block_number, transactions.len());
         assert!(latest_block > 0);
         assert!(!transactions.is_empty());
 
         if let Some(transaction) = transactions.first() {
-            println!("First transaction ID: {}", transaction.id.hash);
             assert!(!transaction.id.hash.is_empty());
         }
     }
@@ -76,7 +74,6 @@ mod chain_integration_tests {
             .await
             .unwrap();
 
-        println!("Address: {}, transactions count: {}", TEST_ADDRESS, transactions.len());
         assert!(!transactions.is_empty());
     }
 

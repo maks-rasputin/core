@@ -48,6 +48,12 @@ pub fn decode_hex(value: &str) -> Result<Vec<u8>, HexError> {
     Ok(hex::decode(&*normalized)?)
 }
 
+pub fn decode_hex_array<const N: usize>(value: &str) -> Result<[u8; N], HexError> {
+    let bytes = decode_hex(value)?;
+    let length = bytes.len();
+    bytes.try_into().map_err(|_| HexError(format!("hex value must be {N} bytes, got {length}")))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -62,6 +68,13 @@ mod tests {
     fn decode_hex_pads_odd_length() {
         let bytes = decode_hex("0xa").expect("decode");
         assert_eq!(bytes, vec![0x0a]);
+    }
+
+    #[test]
+    fn decode_hex_array_validates_length() {
+        assert_eq!(decode_hex_array::<2>("0x0a0b").expect("decode"), [0x0a, 0x0b]);
+        assert_eq!(decode_hex_array::<2>("a0b").expect("decode"), [0x0a, 0x0b]);
+        assert!(decode_hex_array::<2>("0x0a").is_err());
     }
 
     #[test]

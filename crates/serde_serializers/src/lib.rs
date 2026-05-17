@@ -14,6 +14,7 @@ pub mod duration;
 pub use duration::{deserialize as deserialize_duration, deserialize_option as deserialize_option_duration, parse_duration};
 pub mod f64;
 pub use f64::{deserialize_f64_from_str, deserialize_option_f64_from_str, serialize_f64};
+pub mod hex_bytes;
 pub mod string;
 pub use string::{deserialize_string_from_str_or_number, deserialize_string_from_value};
 pub mod u64;

@@ -1,8 +1,8 @@
 use num_bigint::BigUint;
-use num_traits::Num;
 use primitives::{
     AssetBalance, AssetId, Chain,
     asset_balance::{Balance, BalanceMetadata},
+    decode_hex,
 };
 use std::error::Error;
 
@@ -14,12 +14,8 @@ pub fn map_coin_balance(account: &TronAccount) -> Result<AssetBalance, Box<dyn E
 }
 
 pub fn map_token_balance(balance_hex: &str, asset_id: AssetId) -> Result<AssetBalance, Box<dyn Error + Sync + Send>> {
-    let balance = if balance_hex.is_empty() || balance_hex == "0x" {
-        BigUint::from(0u32)
-    } else {
-        let hex_str = balance_hex.strip_prefix("0x").unwrap_or(balance_hex);
-        BigUint::from_str_radix(hex_str, 16).map_err(|e| format!("Failed to parse hex balance: {}", e))?
-    };
+    let balance_bytes = decode_hex(balance_hex).map_err(|e| format!("Failed to parse hex balance: {e}"))?;
+    let balance = BigUint::from_bytes_be(&balance_bytes);
 
     Ok(AssetBalance::new(asset_id, balance))
 }
@@ -83,17 +79,6 @@ pub fn map_balance_staking(account: &TronAccount, reward: &TronReward, usage: &T
             ),
         ))
     }
-}
-
-pub(crate) fn format_address_parameter(address: &str) -> Result<String, Box<dyn Error + Sync + Send>> {
-    let owner_bytes = bs58::decode(address).into_vec().map_err(|e| format!("Invalid owner address {}: {}", address, e))?;
-
-    if owner_bytes.len() != 25 || owner_bytes[0] != 0x41 {
-        return Err(format!("Invalid TRON address format: {}", address).into());
-    }
-
-    let address_bytes = &owner_bytes[1..21];
-    Ok(format!("{:0>64}", hex::encode(address_bytes)))
 }
 
 fn new_stake_balance(
@@ -176,13 +161,6 @@ mod tests {
 
         let balance = map_coin_balance(&account).unwrap();
         assert_eq!(balance.balance.available, BigUint::from(0u32));
-    }
-
-    #[test]
-    fn test_format_address_parameter() {
-        let address = "TEB39Rt69QkgD1BKhqaRNqGxfQzCarkRCb";
-        let parameter = format_address_parameter(address).unwrap();
-        assert_eq!(parameter, "0000000000000000000000002e1d447fa4169390cf5f5b3d12d380decfbfe20f");
     }
 
     #[test]

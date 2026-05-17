@@ -47,7 +47,6 @@ mod chain_integration_tests {
 
         // Latest block should be a positive number
         assert!(latest_block > 0);
-        println!("Latest block number: {}", latest_block);
     }
 
     #[tokio::test]

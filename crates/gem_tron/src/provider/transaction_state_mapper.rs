@@ -29,7 +29,7 @@ mod tests {
 
     fn create_receipt(result: Option<&str>, block_number: i64, fee: Option<i64>) -> TransactionReceiptData {
         TransactionReceiptData {
-            id: "tx_id".to_string(),
+            id: "transaction_id".to_string(),
             fee,
             block_number,
             block_time_stamp: 0,

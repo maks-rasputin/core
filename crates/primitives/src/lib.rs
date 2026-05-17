@@ -152,7 +152,7 @@ pub use self::gorush::{FailedNotification, GorushNotification, GorushNotificatio
 pub mod scan;
 pub use self::scan::{AddressType, ScanAddress, ScanAddressTarget, ScanTransaction, ScanTransactionPayload};
 pub mod hex;
-pub use self::hex::{HexError, decode_hex};
+pub use self::hex::{HexError, decode_hex, decode_hex_array};
 pub mod transaction_metadata_types;
 pub use self::transaction_metadata_types::{
     TransactionNFTTransferMetadata, TransactionPerpetualMetadata, TransactionResourceTypeMetadata, TransactionSmartContractMetadata, TransactionSwapMetadata,

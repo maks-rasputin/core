@@ -1,10 +1,25 @@
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 
-use crate::models::TransactionData;
-use crate::signer::transaction::TronPayload;
+use crate::models::{TransactionData, TronContractType};
 
-const TRIGGER_SMART_CONTRACT: &str = "TriggerSmartContract";
+#[derive(Deserialize)]
+struct TriggerSmartContractPayload {
+    address: Option<String>,
+    transaction: TriggerSmartContractPayloadTransaction,
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum TriggerSmartContractPayloadTransaction {
+    Direct { raw_data: TransactionData },
+    Nested { transaction: TriggerSmartContractNestedTransaction },
+}
+
+#[derive(Deserialize)]
+struct TriggerSmartContractNestedTransaction {
+    raw_data: TransactionData,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TronSmartContractCall {
@@ -44,45 +59,39 @@ impl TriggerSmartContractData {
         let Some(data) = data else {
             return Ok(None);
         };
-        let Ok(payload) = serde_json::from_slice::<TronPayload>(data) else {
+        let Ok(payload) = serde_json::from_slice::<TriggerSmartContractPayload>(data) else {
             return Ok(None);
         };
-        let raw_data_value = payload
-            .transaction
-            .other
-            .get("raw_data")
-            .or_else(|| payload.transaction.other.get("transaction").and_then(|t| t.get("raw_data")));
-        let Some(raw_data_value) = raw_data_value else {
+        let raw_data = match payload.transaction {
+            TriggerSmartContractPayloadTransaction::Direct { raw_data } => raw_data,
+            TriggerSmartContractPayloadTransaction::Nested { transaction } => transaction.raw_data,
+        };
+        let fee_limit = raw_data.fee_limit;
+        let Some(contract) = raw_data.contract.into_iter().next() else {
             return Ok(None);
         };
-        let Ok(raw_data) = serde_json::from_value::<TransactionData>(raw_data_value.clone()) else {
-            return Ok(None);
-        };
-        let Some(contract) = raw_data.contract.first() else {
-            return Ok(None);
-        };
-        if contract.contract_type != TRIGGER_SMART_CONTRACT {
+        if contract.contract_type != Some(TronContractType::TriggerSmart) {
             return Ok(None);
         }
 
-        let value = &contract.parameter.value;
-        let Some(contract_address) = value.contract_address.clone() else {
+        let value = contract.parameter.value;
+        let Some(contract_address) = value.contract_address else {
             return Err("Invalid Tron contract address".into());
         };
-        let Some(data) = value.data.as_deref() else {
+        let Some(data) = value.data else {
             return Ok(None);
         };
-        let owner_address = if payload.address.is_empty() {
-            value.owner_address.clone().unwrap_or_else(|| sender_address.to_string())
-        } else {
-            payload.address
-        };
+        let owner_address = payload
+            .address
+            .filter(|address| !address.is_empty())
+            .or(value.owner_address)
+            .unwrap_or_else(|| sender_address.to_string());
 
         Ok(Some(Self {
             contract_address,
-            data: data.to_string(),
+            data,
             owner_address,
-            fee_limit: raw_data.fee_limit,
+            fee_limit,
             call_value: value.call_value,
         }))
     }

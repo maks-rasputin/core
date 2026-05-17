@@ -3,7 +3,7 @@ use alloy_primitives::hex;
 use number_formatter::BigNumberFormatter;
 use primitives::{
     ChainSigner, HyperliquidOrder, NumberIncrementer, PerpetualConfirmData, PerpetualDirection, PerpetualModifyConfirmData, PerpetualModifyPositionType, PerpetualType,
-    SignerError, SignerInput, TransactionInputType, asset_constants::HYPERCORE_CORE_HYPE_TOKEN_ID, stake_type::StakeType,
+    SignerError, SignerInput, TransactionInputType, asset_constants::HYPERCORE_CORE_HYPE_TOKEN_ID, decode_hex, stake_type::StakeType,
 };
 use serde::Serialize;
 use serde_json::{self, Value};
@@ -69,8 +69,8 @@ impl HyperCoreSigner {
         if let TransactionInputType::Swap(from_asset, to_asset, _) = &input.input_type
             && is_spot_swap(from_asset.chain(), to_asset.chain())
         {
-            let hl_order = input.metadata.get_hyperliquid_order().map_err(SignerError::from_display)?;
-            let agent_key = hex::decode(&hl_order.agent_private_key).map_err(|_| SignerError::InvalidInput("Invalid agent private key".to_string()))?;
+            let hl_order = input.metadata.get_hyperliquid_order()?;
+            let agent_key = decode_hex(&hl_order.agent_private_key).map_err(|_| SignerError::InvalidInput("Invalid agent private key".to_string()))?;
             let builder = get_builder(BUILDER_ADDRESS, hl_order.builder_fee_bps as i32).ok();
 
             let mut order: PlaceOrder = serde_json::from_str(&swap_data.data.data)?;
@@ -121,9 +121,9 @@ impl HyperCoreSigner {
 
     fn sign_perpetual_action(&self, input: &SignerInput, private_key: &[u8]) -> SignerResult<Vec<String>> {
         let perpetual_type = input.input_type.get_perpetual_type().map_err(SignerError::invalid_input)?;
-        let order = input.metadata.get_hyperliquid_order().map_err(SignerError::from_display)?;
+        let order = input.metadata.get_hyperliquid_order()?;
 
-        let agent_key = hex::decode(&order.agent_private_key).map_err(|_| SignerError::InvalidInput("Invalid agent private key".to_string()))?;
+        let agent_key = decode_hex(&order.agent_private_key).map_err(|_| SignerError::InvalidInput("Invalid agent private key".to_string()))?;
         let builder = get_builder(BUILDER_ADDRESS, order.builder_fee_bps as i32).ok();
         let mut timestamp_incrementer = NumberIncrementer::new(Self::timestamp_ms());
 
@@ -303,7 +303,7 @@ impl HyperCoreSigner {
     }
 
     fn build_signed_request(&self, signature: String, action: &str, timestamp: u64) -> SignerResult<String> {
-        let sig_bytes = hex::decode(&signature).map_err(|err| SignerError::InvalidInput(format!("Invalid signature hex: {err}")))?;
+        let sig_bytes = decode_hex(&signature).map_err(|err| SignerError::InvalidInput(format!("Invalid signature hex: {err}")))?;
 
         if sig_bytes.len() < 65 {
             return Err(SignerError::InvalidInput("Signature must be 65 bytes".to_string()));

@@ -135,7 +135,7 @@ mod tests {
                 price: 2236.45,
                 price_percent_change_24h: 11.822499999999991,
                 open_interest: 1_118_225.0,
-                volume_24h: 1_169_046.29406,
+                volume_24h: 1_169_046.294_06,
                 funding: 0.00125,
             }
         );

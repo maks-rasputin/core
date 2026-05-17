@@ -13,11 +13,9 @@ use primitives::{
 };
 
 use crate::{
+    address::TronAddress,
     models::{ChainParameter, TriggerSmartContractData, account::TronAccountUsage},
-    provider::{
-        balances_mapper::format_address_parameter,
-        preload_mapper::{calculate_stake_fee_rate, calculate_transfer_fee_rate, calculate_transfer_token_fee_rate, map_stake_data},
-    },
+    provider::preload_mapper::{calculate_stake_fee_rate, calculate_transfer_fee_rate, calculate_transfer_token_fee_rate, map_stake_data},
     rpc::client::TronClient,
 };
 
@@ -106,12 +104,11 @@ impl<C: Client> TronClient<C> {
         destination_address: String,
         token_id: String,
         value: String,
-        chain_parameters: &[crate::models::ChainParameter],
-        account_usage: &crate::models::account::TronAccountUsage,
+        chain_parameters: &[ChainParameter],
+        account_usage: &TronAccountUsage,
     ) -> Result<TransactionFee, Box<dyn Error + Send + Sync>> {
-        let estimated_energy = self
-            .estimate_trc20_transfer_gas(sender_address, token_id, format_address_parameter(&destination_address)?, value)
-            .await?;
+        let destination_parameter = TronAddress::parse(&destination_address)?.abi_address_parameter();
+        let estimated_energy = self.estimate_trc20_transfer_gas(sender_address, token_id, destination_parameter, value).await?;
         let token_fee = calculate_transfer_token_fee_rate(chain_parameters, account_usage, estimated_energy)?;
 
         Ok(TransactionFee::new_gas_price_type(

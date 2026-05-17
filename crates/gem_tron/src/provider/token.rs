@@ -32,7 +32,6 @@ mod chain_integration_tests {
         assert_eq!(asset.symbol, "USDT");
         assert_eq!(asset.decimals, 6);
         assert_eq!(asset.id.token_id, Some(TEST_USDT_TOKEN_ID.to_string()));
-        println!("Token data: {}", asset.name);
     }
 
     #[tokio::test]

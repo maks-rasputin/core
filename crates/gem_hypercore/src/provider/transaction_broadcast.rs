@@ -1,4 +1,4 @@
-use alloy_primitives::{Address, hex};
+use alloy_primitives::Address;
 use async_trait::async_trait;
 use chain_traits::{ChainTransactionBroadcast, ChainTransactionDecode};
 use gem_hash::keccak::keccak256;
@@ -7,7 +7,7 @@ use serde::Deserialize;
 use std::error::Error;
 
 use gem_client::Client;
-use primitives::BroadcastOptions;
+use primitives::{BroadcastOptions, hex::decode_hex_array};
 
 use crate::{
     core::{
@@ -106,10 +106,8 @@ fn typed_data_for_request(request: &SignedExchangeRequest) -> Result<String, Box
 }
 
 fn signature_from_request(signature: &SignedExchangeSignature) -> Result<Signature, Box<dyn Error + Sync + Send>> {
-    let r = hex::decode(signature.r.trim_start_matches("0x"))?;
-    let s = hex::decode(signature.s.trim_start_matches("0x"))?;
-    let r: [u8; 32] = r.try_into().map_err(|_| "Invalid r length")?;
-    let s: [u8; 32] = s.try_into().map_err(|_| "Invalid s length")?;
+    let r = decode_hex_array(&signature.r)?;
+    let s = decode_hex_array(&signature.s)?;
     Ok(Signature::from_scalars(r, s)?)
 }
 

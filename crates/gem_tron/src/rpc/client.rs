@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use chain_traits::{ChainAccount, ChainPerpetual, ChainTraits};
 use num_bigint::BigUint;
-use primitives::{Asset, AssetId, asset_type::AssetType, chain::Chain};
+use primitives::{Asset, AssetId, asset_type::AssetType, chain::Chain, decode_hex};
 use std::{error::Error, str::FromStr};
 
 use crate::address::TronAddress;
@@ -86,25 +86,15 @@ impl<C: Client> TronClient<C> {
     }
 
     pub async fn get_token_allowance(&self, owner_address: &str, token_address: &str, spender_address: &str) -> Result<BigUint, Box<dyn Error + Send + Sync>> {
-        let owner_hex = TronAddress::to_hex(owner_address).ok_or("Invalid owner address")?;
-        let spender_hex = TronAddress::to_hex(spender_address).ok_or("Invalid spender address")?;
-
-        let owner_bytes = hex::decode(owner_hex)?;
-        let spender_bytes = hex::decode(spender_hex)?;
-
-        if owner_bytes.len() <= 1 || spender_bytes.len() <= 1 {
-            return Err("Invalid Tron address bytes".into());
-        }
-
-        let owner = AlloyAddress::from_slice(&owner_bytes[1..]);
-        let spender = AlloyAddress::from_slice(&spender_bytes[1..]);
+        let owner = AlloyAddress::from_slice(TronAddress::parse(owner_address)?.account_id());
+        let spender = AlloyAddress::from_slice(TronAddress::parse(spender_address)?.account_id());
         let encoded = gem_evm::contracts::erc20::IERC20::allowanceCall { owner, spender }.abi_encode();
         let parameter = hex::encode(&encoded[4..]);
 
         let result = self
             .trigger_constant_contract_with_owner(owner_address, token_address, "allowance(address,address)", &parameter)
             .await?;
-        let allowance_bytes = hex::decode(result.trim_start_matches("0x"))?;
+        let allowance_bytes = decode_hex(&result)?;
         let allowance = BigUint::from_bytes_be(&allowance_bytes);
         Ok(allowance)
     }
@@ -173,7 +163,7 @@ impl<C: Client> TronClient<C> {
         let name = decode_abi_string(&name)?;
         let symbol = decode_abi_string(&symbol)?;
         let decimals = decode_abi_uint8(&decimals)?;
-        let asset_id = AssetId::from(Chain::Tron, Some(token_id.clone()));
+        let asset_id = AssetId::from(Chain::Tron, Some(token_id));
         Ok(Asset::new(asset_id, name, symbol, decimals as i32, AssetType::TRC20))
     }
 

@@ -21,8 +21,8 @@ pub struct TronAccount {
 
 impl TronAccount {
     pub fn is_staking(&self) -> bool {
-        self.frozen_v2.as_ref().unwrap_or(&vec![]).iter().filter(|x| x.amount > 0).count() > 0
-            || self.unfrozen_v2.as_ref().unwrap_or(&vec![]).iter().filter(|x| x.unfreeze_amount > 0).count() > 0
+        self.frozen_v2.as_deref().is_some_and(|items| items.iter().any(|item| item.amount > 0))
+            || self.unfrozen_v2.as_deref().is_some_and(|items| items.iter().any(|item| item.unfreeze_amount > 0))
             || self.votes.is_some()
     }
 }

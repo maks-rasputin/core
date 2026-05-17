@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use bigdecimal::{BigDecimal, Signed, Zero};
 use num_traits::ToPrimitive;
-use primitives::SignerError;
+use primitives::{SignerError, hex::decode_hex_array};
 
 use crate::address::XrpAddress;
 
@@ -114,9 +114,8 @@ impl IssuedAmount {
 }
 
 fn currency_code_bytes(value: &str) -> Result<[u8; CURRENCY_CODE_LENGTH], SignerError> {
-    if value.len() == CURRENCY_CODE_LENGTH * 2 {
-        let bytes = hex::decode(value).map_err(|_| SignerError::invalid_input("invalid XRP currency code"))?;
-        return bytes.try_into().map_err(|_| SignerError::invalid_input("invalid XRP currency code length"));
+    if value.len() == CURRENCY_CODE_LENGTH * 2 || value.starts_with("0x") {
+        return decode_hex_array(value).map_err(|_| SignerError::invalid_input("invalid XRP currency code"));
     }
 
     let mut bytes = [0; CURRENCY_CODE_LENGTH];

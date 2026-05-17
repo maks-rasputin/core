@@ -127,9 +127,9 @@ impl CosmosChainSigner {
         memo: &str,
         private_key: &[u8],
     ) -> Result<String, SignerError> {
-        let account_number = metadata.get_account_number().map_err(SignerError::from_display)?;
-        let sequence = metadata.get_sequence().map_err(SignerError::from_display)?;
-        let chain_id = metadata.get_chain_id().map_err(SignerError::from_display)?;
+        let account_number = metadata.get_account_number()?;
+        let sequence = metadata.get_sequence()?;
+        let chain_id = metadata.get_chain_id()?;
         let encoded: Vec<Vec<u8>> = messages.iter().map(|m| m.encode_as_any(chain)).collect::<Result<Vec<_>, _>>()?;
         let body_bytes = CosmosTxParams::encode_tx_body(&encoded, memo);
 

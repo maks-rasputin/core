@@ -21,7 +21,7 @@ impl StellarTransaction {
     pub fn transfer(input: &SignerInput) -> Result<Self, SignerError> {
         let amount = input.value_as_u64()?;
         let destination = StellarAddress::from_str(&input.destination_address).invalid_input("invalid Stellar address")?;
-        let is_destination_exist = input.metadata.get_is_destination_address_exist().map_err(SignerError::from_display)?;
+        let is_destination_exist = input.metadata.get_is_destination_address_exist()?;
 
         let operation = if is_destination_exist {
             Operation::Payment { destination, asset: None, amount }
@@ -33,7 +33,7 @@ impl StellarTransaction {
     }
 
     pub fn token_transfer(input: &SignerInput) -> Result<Self, SignerError> {
-        if !input.metadata.get_is_destination_address_exist().map_err(SignerError::from_display)? {
+        if !input.metadata.get_is_destination_address_exist()? {
             return SignerError::invalid_input_err("Stellar destination account not found for token transfer");
         }
 
@@ -59,7 +59,7 @@ impl StellarTransaction {
         Ok(Self {
             account: StellarAddress::from_str(&input.sender_address).invalid_input("invalid Stellar address")?,
             fee,
-            sequence: input.metadata.get_sequence().map_err(SignerError::from_display)?,
+            sequence: input.metadata.get_sequence()?,
             memo: memo(input.memo.as_deref())?,
             time_bounds: None,
             operation,

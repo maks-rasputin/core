@@ -1,4 +1,5 @@
 use crate::address::serializer::deserialize as tron_address_deserialize;
+use primitives::hex::decode_hex_utf8;
 use serde::{Deserialize, Serialize};
 use std::{error::Error, fmt};
 
@@ -6,12 +7,18 @@ pub mod account;
 pub mod block;
 pub mod chain;
 pub mod contract;
+pub mod contract_type;
+#[cfg(feature = "signer")]
+pub(crate) mod signing;
 pub mod transaction;
 
 pub use account::*;
 pub use block::*;
 pub use chain::*;
 pub use contract::*;
+pub use contract_type::*;
+#[cfg(feature = "signer")]
+pub(crate) use signing::*;
 pub use transaction::*;
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -39,7 +46,7 @@ pub struct BlockHeaderData {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Transaction {
     #[serde(rename = "txID")]
-    pub tx_id: String,
+    pub transaction_id: String,
     pub ret: Vec<ContractRet>,
     pub raw_data: TransactionData,
 }
@@ -60,7 +67,8 @@ pub struct TransactionData {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Contract {
     #[serde(rename = "type")]
-    pub contract_type: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub contract_type: Option<TronContractType>,
     pub parameter: ContractParameter,
 }
 
@@ -164,12 +172,10 @@ impl TriggerContractResult {
             return None;
         }
 
-        let message = self.message.as_deref().map(|message_hex| {
-            hex::decode(message_hex)
-                .ok()
-                .and_then(|bytes| String::from_utf8(bytes).ok())
-                .unwrap_or_else(|| message_hex.to_string())
-        });
+        let message = self
+            .message
+            .as_deref()
+            .map(|message_hex| decode_hex_utf8(message_hex).unwrap_or_else(|| message_hex.to_string()));
 
         Some(TronRpcError { code: self.code.clone(), message })
     }

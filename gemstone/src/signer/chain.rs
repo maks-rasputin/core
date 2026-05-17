@@ -11,7 +11,7 @@ use gem_solana::signer::SolanaChainSigner;
 use gem_stellar::StellarChainSigner;
 use gem_sui::signer::SuiChainSigner;
 use gem_ton::signer::TonChainSigner;
-use gem_tron::TronChainSigner;
+use gem_tron::signer::TronChainSigner;
 use gem_xrp::signer::XrpChainSigner;
 use primitives::{Chain, ChainSigner, ChainType, EVMChain, SignerError, SignerInput};
 

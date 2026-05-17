@@ -15,7 +15,10 @@ use zeroize::Zeroizing;
 pub use crate::address::Base32Address;
 pub use crate::ed25519::{ED25519_KEY_TYPE, Ed25519KeyPair};
 pub use crate::error::InvalidInput;
-pub use crate::secp256k1::{RECOVERY_ID_INDEX, SIGNATURE_LENGTH, apply_eth_recovery_id, public_key_from_private as secp256k1_public_key};
+pub use crate::secp256k1::{
+    RECOVERY_ID_INDEX, SIGNATURE_LENGTH, ensure_ethereum_signature_recovery_id_offset, public_key_from_private as secp256k1_public_key,
+    uncompressed_public_key_from_private as secp256k1_uncompressed_public_key,
+};
 
 pub use decode::{decode_private_key, encode_private_key, supports_private_key_import};
 pub use eip712::hash_typed_data as hash_eip712;
@@ -40,14 +43,14 @@ impl Signer {
     }
 
     /// Sign a secp256k1 digest returning [r(32), s(32), v(1)] where v ∈ {27, 28}.
-    pub fn sign_eth_digest(digest: &[u8], private_key: &[u8]) -> Result<Vec<u8>, SignerError> {
+    pub fn sign_ethereum_digest(digest: &[u8], private_key: &[u8]) -> Result<Vec<u8>, SignerError> {
         let private_key = Zeroizing::new(private_key.to_vec());
-        secp256k1::sign_eth_digest(digest, &private_key)
+        secp256k1::sign_ethereum_digest(digest, &private_key)
     }
 
     pub fn sign_eip712(typed_data_json: &str, private_key: &[u8]) -> Result<String, SignerError> {
         let digest = eip712::hash_typed_data(typed_data_json)?;
-        let signature = Self::sign_eth_digest(&digest, private_key)?;
+        let signature = Self::sign_ethereum_digest(&digest, private_key)?;
         Ok(hex::encode(signature))
     }
 }

@@ -133,19 +133,19 @@ pub enum WalletConnectResponseType {
 // From conversions: primitives -> UniFFI
 
 impl From<WCEthereumTransaction> for WCEthereumTransactionData {
-    fn from(tx: WCEthereumTransaction) -> Self {
+    fn from(transaction: WCEthereumTransaction) -> Self {
         Self {
-            chain_id: tx.chain_id,
-            from: tx.from,
-            to: tx.to,
-            value: tx.value,
-            gas: tx.gas,
-            gas_limit: tx.gas_limit,
-            gas_price: tx.gas_price,
-            max_fee_per_gas: tx.max_fee_per_gas,
-            max_priority_fee_per_gas: tx.max_priority_fee_per_gas,
-            nonce: tx.nonce,
-            data: tx.data,
+            chain_id: transaction.chain_id,
+            from: transaction.from,
+            to: transaction.to,
+            value: transaction.value,
+            gas: transaction.gas,
+            gas_limit: transaction.gas_limit,
+            gas_price: transaction.gas_price,
+            max_fee_per_gas: transaction.max_fee_per_gas,
+            max_priority_fee_per_gas: transaction.max_priority_fee_per_gas,
+            nonce: transaction.nonce,
+            data: transaction.data,
         }
     }
 }

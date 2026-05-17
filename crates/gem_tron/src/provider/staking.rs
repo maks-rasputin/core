@@ -116,12 +116,9 @@ mod integration_tests {
     async fn test_get_staking_apy() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let client = create_test_client();
         let apy = client.get_staking_apy().await?;
+        let apy_value = apy.expect("Tron staking APY should be present");
 
-        println!("TRON APY: {}", apy.unwrap_or(0.0));
-
-        assert!(apy.is_some());
-        let apy_value = apy.unwrap();
-        assert!(apy_value > 0.0 || apy_value < 50.0);
+        assert!(apy_value > 0.0 && apy_value < 50.0);
         Ok(())
     }
 
@@ -131,13 +128,10 @@ mod integration_tests {
         let apy = client.get_staking_apy().await?;
         let validators = client.get_staking_validators(apy).await?;
 
-        println!("TRON validators count: {}", validators.len());
-
         assert!(!validators.is_empty());
         assert!(validators.len() > 27);
-        let system_validator = validators.iter().find(|v| v.id == "system");
-        assert!(system_validator.is_some());
-        assert_eq!(system_validator.unwrap().name, "Unstaking");
+        let system_validator = validators.iter().find(|v| v.id == "system").expect("system validator should exist");
+        assert_eq!(system_validator.name, "Unstaking");
         Ok(())
     }
 

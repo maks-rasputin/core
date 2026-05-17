@@ -3515,6 +3515,7 @@ dependencies = [
  "chrono",
  "futures",
  "gem_client",
+ "gem_encoding",
  "gem_evm",
  "gem_hash",
  "hex",
@@ -3525,8 +3526,10 @@ dependencies = [
  "reqwest 0.13.2",
  "serde",
  "serde_json",
+ "serde_serializers",
  "settings",
  "signer",
+ "strum",
  "tokio",
 ]
 
@@ -6864,6 +6867,7 @@ dependencies = [
 name = "serde_serializers"
 version = "1.0.0"
 dependencies = [
+ "hex",
  "num-bigint",
  "serde",
  "serde_json",

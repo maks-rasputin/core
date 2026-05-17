@@ -8,7 +8,8 @@ use num_bigint::BigUint;
 use primitives::{AssetBalance, AssetId, Chain, asset_balance::BalanceMetadata};
 
 use crate::{
-    provider::balances_mapper::{format_address_parameter, map_balance_staking, map_coin_balance, map_token_balance},
+    address::TronAddress,
+    provider::balances_mapper::{map_balance_staking, map_coin_balance, map_token_balance},
     rpc::{client::TronClient, trongrid::mapper::TronGridMapper},
 };
 
@@ -20,7 +21,7 @@ impl<C: Client> ChainBalances for TronClient<C> {
     }
 
     async fn get_balance_tokens(&self, address: String, token_ids: Vec<String>) -> Result<Vec<AssetBalance>, Box<dyn Error + Sync + Send>> {
-        let parameter = format_address_parameter(&address)?;
+        let parameter = TronAddress::parse(&address)?.abi_address_parameter();
 
         let futures: Vec<_> = token_ids
             .into_iter()
@@ -38,8 +39,8 @@ impl<C: Client> ChainBalances for TronClient<C> {
 
     async fn get_balance_staking(&self, address: String) -> Result<Option<AssetBalance>, Box<dyn Error + Sync + Send>> {
         let account = self.get_account(&address).await?;
-        if let Some(address) = account.clone().address {
-            let (reward, usage) = futures::try_join!(self.get_reward(&address), self.get_account_usage(&address))?;
+        if let Some(address) = &account.address {
+            let (reward, usage) = futures::try_join!(self.get_reward(address), self.get_account_usage(address))?;
             Ok(Some(map_balance_staking(&account, &reward, &usage)?))
         } else {
             Ok(Some(AssetBalance::new_staking_with_metadata(
@@ -54,11 +55,7 @@ impl<C: Client> ChainBalances for TronClient<C> {
 
     async fn get_balance_assets(&self, address: String) -> Result<Vec<AssetBalance>, Box<dyn Error + Send + Sync>> {
         let account = self.trongrid_client.get_accounts_by_address(&address).await?;
-        if let Some(account) = account.data.first() {
-            Ok(TronGridMapper::map_asset_balances(account.clone()))
-        } else {
-            Ok(vec![])
-        }
+        Ok(account.data.into_iter().next().map(TronGridMapper::map_asset_balances).unwrap_or_default())
     }
 }
 
@@ -105,8 +102,6 @@ mod chain_integration_tests {
         let client = create_test_client();
         let balance = client.get_balance_staking(TEST_ADDRESS.to_string()).await?;
 
-        println!("balance: {:#?}", balance);
-
         let balance = balance.ok_or("Staking balance not found")?;
 
         assert_eq!(balance.asset_id.chain, Chain::Tron);
@@ -114,8 +109,6 @@ mod chain_integration_tests {
         assert!(balance.balance.staked > BigUint::from(0u32));
 
         let metadata = balance.balance.metadata.as_ref().ok_or("Metadata not found")?;
-
-        println!("metadata: {:#?}", metadata);
 
         assert!(metadata.bandwidth_available > 0);
         assert!(metadata.bandwidth_total >= 600);
@@ -137,10 +130,7 @@ mod chain_integration_tests {
 
         assert!(!assets.is_empty(), "TRON test address should have TRC20 tokens");
 
-        println!("TRON assets count: {}", assets.len());
-
         for asset in &assets {
-            println!("Asset: {:?}", asset);
             assert_eq!(asset.asset_id.chain, Chain::Tron);
             assert!(asset.balance.available > BigUint::from(0u32));
             assert!(asset.asset_id.token_id.is_some());

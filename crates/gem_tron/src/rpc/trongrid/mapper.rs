@@ -9,14 +9,11 @@ use primitives::{AssetBalance, AssetId, Chain};
 pub struct TronGridMapper;
 
 impl TronGridMapper {
-    pub fn get_chain() -> Chain {
-        Chain::Tron
-    }
     pub fn map_transactions(transactions: Vec<Transaction>, receipts: Vec<TransactionReceiptData>) -> Vec<primitives::Transaction> {
         transactions
             .into_iter()
-            .zip(receipts.iter())
-            .flat_map(|(transaction, receipt)| map_transaction(Self::get_chain(), transaction, receipt.clone()))
+            .zip(receipts)
+            .flat_map(|(transaction, receipt)| map_transaction(Chain::Tron, transaction, receipt))
             .collect()
     }
 
@@ -26,10 +23,7 @@ impl TronGridMapper {
             .into_iter()
             .flat_map(|trc20_map| {
                 trc20_map.into_iter().map(|(contract_address, balance)| {
-                    AssetBalance::new(
-                        AssetId::from(Self::get_chain(), Some(contract_address.clone())),
-                        BigUint::from_str(balance.as_str()).unwrap_or_default(),
-                    )
+                    AssetBalance::new(AssetId::from(Chain::Tron, Some(contract_address)), BigUint::from_str(balance.as_str()).unwrap_or_default())
                 })
             })
             .collect()

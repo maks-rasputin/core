@@ -1,5 +1,5 @@
 use num_traits::ToPrimitive;
-use primitives::{Chain, SignerError, TransactionInputType, TransactionLoadInput, TransactionLoadMetadata, UTXO};
+use primitives::{Chain, SignerError, TransactionInputType, TransactionLoadInput, TransactionLoadMetadata, UTXO, hex::decode_hex_array};
 
 use crate::{
     address::ShelleyAddress,
@@ -64,11 +64,7 @@ pub(crate) fn plan_transfer(input: &TransactionLoadInput) -> Result<TransactionP
 
 pub(crate) fn transaction_from_plan(input: &TransactionLoadInput, plan: &TransactionPlan) -> Result<Transaction, SignerError> {
     let destination = ShelleyAddress::parse(&input.destination_address)?;
-    let expiration_block_number = input
-        .metadata
-        .get_block_number()
-        .map(|block_number| block_number + CARDANO_EXPIRATION_BLOCK_OFFSET)
-        .map_err(SignerError::from_display)?;
+    let expiration_block_number = input.metadata.get_block_number()? + CARDANO_EXPIRATION_BLOCK_OFFSET;
     let mut outputs = vec![TransactionOutput {
         address: destination.as_bytes().to_vec(),
         amount: plan.amount,
@@ -92,7 +88,7 @@ pub(crate) fn transaction_from_plan(input: &TransactionLoadInput, plan: &Transac
 
 fn utxos_from_metadata(metadata: &TransactionLoadMetadata, sender_address: &str) -> Result<Vec<UTXO>, SignerError> {
     let sender = ShelleyAddress::parse(sender_address)?;
-    let utxos = metadata.get_utxos().map_err(SignerError::from_display)?;
+    let utxos = metadata.get_utxos()?;
     for utxo in &utxos {
         utxo_transaction_input(utxo)?;
         utxo_amount(utxo)?;
@@ -105,10 +101,7 @@ fn utxos_from_metadata(metadata: &TransactionLoadMetadata, sender_address: &str)
 }
 
 fn utxo_transaction_input(utxo: &UTXO) -> Result<TransactionInput, SignerError> {
-    let transaction_hash: [u8; 32] = hex::decode(&utxo.transaction_id)
-        .map_err(|_| SignerError::invalid_input("invalid Cardano UTXO transaction id"))?
-        .try_into()
-        .map_err(|_| SignerError::invalid_input("invalid Cardano UTXO transaction id"))?;
+    let transaction_hash = decode_hex_array(&utxo.transaction_id).map_err(|_| SignerError::invalid_input("invalid Cardano UTXO transaction id"))?;
     let output_index = utxo.vout.to_u64().ok_or_else(|| SignerError::invalid_input("invalid Cardano UTXO output index"))?;
     Ok(TransactionInput { transaction_hash, output_index })
 }

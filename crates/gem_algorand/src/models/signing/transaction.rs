@@ -46,15 +46,15 @@ impl AlgorandTransaction {
 
     fn from_input(input: &SignerInput, operation: Operation) -> Result<Self, SignerError> {
         let fee = input.fee.fee.to_u64().invalid_input("invalid transaction fee")?;
-        let first_round = input.metadata.get_sequence().map_err(SignerError::from_display)?;
+        let first_round = input.metadata.get_sequence()?;
 
         Ok(Self {
             sender: AlgorandAddress::from_str(&input.sender_address).invalid_input("invalid Algorand address")?,
             fee,
             first_round,
             last_round: first_round + TRANSACTION_VALIDITY_ROUNDS,
-            genesis_id: input.metadata.get_chain_id().map_err(SignerError::from_display)?,
-            genesis_hash: decode_base64(&input.metadata.get_block_hash().map_err(SignerError::from_display)?).invalid_input("invalid Algorand genesis hash")?,
+            genesis_id: input.metadata.get_chain_id()?,
+            genesis_hash: decode_base64(&input.metadata.get_block_hash()?).invalid_input("invalid Algorand genesis hash")?,
             note: input.memo.clone().unwrap_or_default().into_bytes(),
             operation,
         })

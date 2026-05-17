@@ -1,6 +1,6 @@
 use crate::address::TronAddress;
 use crate::models::WitnessesList;
-use primitives::{Chain, DelegationValidator, StakeValidator};
+use primitives::{Address as _, Chain, DelegationValidator, StakeValidator};
 
 const SYSTEM_UNSTAKING_VALIDATOR_ID: &str = "system";
 const SYSTEM_UNSTAKING_VALIDATOR_NAME: &str = "Unstaking";
@@ -17,7 +17,7 @@ pub fn map_staking_validators(witnesses: WitnessesList, apy: Option<f64>) -> Vec
         .filter_map(|witness| {
             Some(DelegationValidator::stake(
                 Chain::Tron,
-                TronAddress::from_hex(&witness.address)?,
+                TronAddress::from_hex(&witness.address)?.encode(),
                 String::new(),
                 witness.is_jobs.unwrap_or(false),
                 0.0,

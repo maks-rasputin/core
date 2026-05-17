@@ -1,13 +1,13 @@
 pub mod address;
-pub mod signer;
+pub mod models;
 
 pub use address::validate_address;
-pub use signer::TronChainSigner;
+
+#[cfg(feature = "signer")]
+pub mod signer;
 
 #[cfg(feature = "rpc")]
 pub mod rpc;
 
 #[cfg(feature = "rpc")]
 pub mod provider;
-
-pub mod models;

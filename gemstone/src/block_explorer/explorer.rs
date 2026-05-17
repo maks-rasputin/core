@@ -76,16 +76,16 @@ mod tests {
         assert_eq!(explorers[1].name(), "Mempool");
 
         let explorer = Explorer::new(chain.as_ref());
-        let tx_url = explorer.get_transaction_url(&explorers[0].name(), "813d80363c09b1c4d3f0c6ce3382a048b320edefb573a8aedbc7ddd4c65cf7e4");
+        let transaction_url = explorer.get_transaction_url(&explorers[0].name(), "813d80363c09b1c4d3f0c6ce3382a048b320edefb573a8aedbc7ddd4c65cf7e4");
 
         assert_eq!(
-            tx_url,
+            transaction_url,
             "https://blockchair.com/bitcoin/transaction/813d80363c09b1c4d3f0c6ce3382a048b320edefb573a8aedbc7ddd4c65cf7e4"
         );
 
-        let tx_url = explorer.get_transaction_url(&explorers[1].name(), "813d80363c09b1c4d3f0c6ce3382a048b320edefb573a8aedbc7ddd4c65cf7e4");
+        let transaction_url = explorer.get_transaction_url(&explorers[1].name(), "813d80363c09b1c4d3f0c6ce3382a048b320edefb573a8aedbc7ddd4c65cf7e4");
 
-        assert_eq!(tx_url, "https://mempool.space/tx/813d80363c09b1c4d3f0c6ce3382a048b320edefb573a8aedbc7ddd4c65cf7e4");
+        assert_eq!(transaction_url, "https://mempool.space/tx/813d80363c09b1c4d3f0c6ce3382a048b320edefb573a8aedbc7ddd4c65cf7e4");
     }
 
     #[test]
@@ -99,12 +99,15 @@ mod tests {
 
         let explorer = Explorer::new(chain.as_ref());
         let account_url = explorer.get_address_url(&explorers[0].name(), "0x1f9090aae28b8a3dceadf281b0f12828e676c326");
-        let tx_url = explorer.get_transaction_url(&explorers[0].name(), "0xfd96a9ee20a7440bf65a5b8ecf7f884289ed78e28f82d45343a70f459e7a42a0");
+        let transaction_url = explorer.get_transaction_url(&explorers[0].name(), "0xfd96a9ee20a7440bf65a5b8ecf7f884289ed78e28f82d45343a70f459e7a42a0");
         let token_url = explorer.get_token_url(&explorers[0].name(), "0xdac17f958d2ee523a2206206994597c13d831ec7");
         let nft_url = explorer.get_nft_url(&explorers[0].name(), "0x47A00fC8590C11bE4c419D9Ae50DEc267B6E24ee", "11871");
 
         assert_eq!(account_url, "https://etherscan.io/address/0x1f9090aae28b8a3dceadf281b0f12828e676c326");
-        assert_eq!(tx_url, "https://etherscan.io/tx/0xfd96a9ee20a7440bf65a5b8ecf7f884289ed78e28f82d45343a70f459e7a42a0");
+        assert_eq!(
+            transaction_url,
+            "https://etherscan.io/tx/0xfd96a9ee20a7440bf65a5b8ecf7f884289ed78e28f82d45343a70f459e7a42a0"
+        );
         assert_eq!(token_url, Some("https://etherscan.io/token/0xdac17f958d2ee523a2206206994597c13d831ec7".to_string()));
         assert_eq!(nft_url, Some("https://etherscan.io/nft/0x47A00fC8590C11bE4c419D9Ae50DEc267B6E24ee/11871".to_string()));
     }
@@ -126,9 +129,12 @@ mod tests {
         assert_eq!(account_url, format!("https://tonviewer.com/{TON_USDT_TOKEN_ID}"));
         assert_eq!(token_url, account_url);
 
-        let tx_url = explorer.get_transaction_url(&explorers[0].name(), "cefe5c6d145976c434280648fae28dfdfee58002e8c4e36195550ed6cdb22aa0");
+        let transaction_url = explorer.get_transaction_url(&explorers[0].name(), "cefe5c6d145976c434280648fae28dfdfee58002e8c4e36195550ed6cdb22aa0");
 
-        assert_eq!(tx_url, "https://tonviewer.com/transaction/cefe5c6d145976c434280648fae28dfdfee58002e8c4e36195550ed6cdb22aa0");
+        assert_eq!(
+            transaction_url,
+            "https://tonviewer.com/transaction/cefe5c6d145976c434280648fae28dfdfee58002e8c4e36195550ed6cdb22aa0"
+        );
     }
 
     #[test]
@@ -176,13 +182,16 @@ mod tests {
 
         let explorer = Explorer::new(chain.as_ref());
         let account_url = explorer.get_address_url(&explorers[0].name(), "cosmos1fxygpgus4nd5jmfl5j7fh5y8hyy53z8u95dzx7");
-        let tx_url = explorer.get_transaction_url(&explorers[0].name(), "CFB4B38D75DB9D9055A7D4A2A76C67B8A27C37124C4E5663BEE104589E726763");
+        let transaction_url = explorer.get_transaction_url(&explorers[0].name(), "CFB4B38D75DB9D9055A7D4A2A76C67B8A27C37124C4E5663BEE104589E726763");
         let asset_url = explorer
             .get_token_url(&explorers[0].name(), "ibc/0025F8A87464A471E66B234C4F93AEC5B4DA3D42D7986451A059273426290DD5")
             .unwrap();
 
         assert_eq!(account_url, "https://www.mintscan.io/cosmos/address/cosmos1fxygpgus4nd5jmfl5j7fh5y8hyy53z8u95dzx7");
-        assert_eq!(tx_url, "https://www.mintscan.io/cosmos/tx/CFB4B38D75DB9D9055A7D4A2A76C67B8A27C37124C4E5663BEE104589E726763");
+        assert_eq!(
+            transaction_url,
+            "https://www.mintscan.io/cosmos/tx/CFB4B38D75DB9D9055A7D4A2A76C67B8A27C37124C4E5663BEE104589E726763"
+        );
         assert_eq!(
             asset_url,
             "https://www.mintscan.io/cosmos/assets/ibc/0025F8A87464A471E66B234C4F93AEC5B4DA3D42D7986451A059273426290DD5"
@@ -199,10 +208,13 @@ mod tests {
 
         let explorer = Explorer::new(chain.as_ref());
         let account_url = explorer.get_address_url(&explorers[0].name(), "noble17w8y9eujrz4m08nn0h349s5h2rs8uz5hqe02z4");
-        let tx_url = explorer.get_transaction_url(&explorers[0].name(), "22F0B4F48A85925A668D64134B7377476DC5BAE3CF7CC38AFC0E17E5F7D90001");
+        let transaction_url = explorer.get_transaction_url(&explorers[0].name(), "22F0B4F48A85925A668D64134B7377476DC5BAE3CF7CC38AFC0E17E5F7D90001");
 
         assert_eq!(account_url, "https://www.mintscan.io/noble/address/noble17w8y9eujrz4m08nn0h349s5h2rs8uz5hqe02z4");
-        assert_eq!(tx_url, "https://www.mintscan.io/noble/tx/22F0B4F48A85925A668D64134B7377476DC5BAE3CF7CC38AFC0E17E5F7D90001");
+        assert_eq!(
+            transaction_url,
+            "https://www.mintscan.io/noble/tx/22F0B4F48A85925A668D64134B7377476DC5BAE3CF7CC38AFC0E17E5F7D90001"
+        );
     }
 
     #[test]
@@ -251,11 +263,11 @@ mod tests {
 
         let explorer = Explorer::new(chain.as_ref());
         let account_url = explorer.get_address_url(&explorers[0].name(), "TJApZYJwPKuQR7tL6FmvD6jDjbYpHESZGH");
-        let tx_url = explorer.get_transaction_url(&explorers[0].name(), "4e55fe0a528240152ab566dc11ce593a30c1d2cfd0fc91f0c555887639eab2db");
+        let transaction_url = explorer.get_transaction_url(&explorers[0].name(), "4e55fe0a528240152ab566dc11ce593a30c1d2cfd0fc91f0c555887639eab2db");
 
         assert_eq!(account_url, "https://tronscan.org/#/address/TJApZYJwPKuQR7tL6FmvD6jDjbYpHESZGH");
         assert_eq!(
-            tx_url,
+            transaction_url,
             "https://tronscan.org/#/transaction/4e55fe0a528240152ab566dc11ce593a30c1d2cfd0fc91f0c555887639eab2db"
         );
     }
@@ -269,16 +281,16 @@ mod tests {
 
         let explorer = Explorer::new(Chain::Thorchain.as_ref());
         let account_url: String = explorer.get_address_url(&explorers[0].name(), "thor166n4w5039meulfa3p6ydg60ve6ueac7tlt0jws");
-        let tx_url = explorer.get_transaction_url(&explorers[0].name(), "FF82C517ECFDCA71A6CD3501063D76995C67509B2AFC012D2BCE61C130C05E98");
+        let transaction_url = explorer.get_transaction_url(&explorers[0].name(), "FF82C517ECFDCA71A6CD3501063D76995C67509B2AFC012D2BCE61C130C05E98");
 
         assert_eq!(account_url, "https://runescan.io/address/thor166n4w5039meulfa3p6ydg60ve6ueac7tlt0jws");
-        assert_eq!(tx_url, "https://runescan.io/tx/FF82C517ECFDCA71A6CD3501063D76995C67509B2AFC012D2BCE61C130C05E98");
+        assert_eq!(transaction_url, "https://runescan.io/tx/FF82C517ECFDCA71A6CD3501063D76995C67509B2AFC012D2BCE61C130C05E98");
     }
 
     #[test]
     fn test_transaction_swap_url() {
         let explorer = Explorer::new(Chain::Thorchain.as_ref());
-        let tx_url = explorer
+        let transaction_url = explorer
             .get_transaction_swap_url(
                 "runescan",
                 "0x0299923c9a0a40e3a296058ac2c5c3a7b41f91803ea36ad9645492ccca0f8631".into(),
@@ -286,10 +298,13 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(tx_url.url, "https://runescan.io/tx/0299923c9a0a40e3a296058ac2c5c3a7b41f91803ea36ad9645492ccca0f8631");
+        assert_eq!(
+            transaction_url.url,
+            "https://runescan.io/tx/0299923c9a0a40e3a296058ac2c5c3a7b41f91803ea36ad9645492ccca0f8631"
+        );
 
         let explorer = Explorer::new(Chain::Solana.as_ref());
-        let tx_url = explorer
+        let transaction_url = explorer
             .get_transaction_swap_url(
                 "solscan",
                 "0x56acc6a58fc0bdd9e9be5cc2a3ff079b91b933f562cf0fe760f1d8d6b76f4876".into(),
@@ -298,7 +313,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            tx_url.url,
+            transaction_url.url,
             "https://explorer.mayan.finance/tx/0x56acc6a58fc0bdd9e9be5cc2a3ff079b91b933f562cf0fe760f1d8d6b76f4876"
         );
     }

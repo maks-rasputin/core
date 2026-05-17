@@ -21,13 +21,13 @@ struct GemTestTests {
         #expect(explorers[1] == "Mempool")
 
         let explorer = Explorer(chain: chain)
-        let txUrl = explorer.getTransactionUrl(
+        let transactionUrl = explorer.getTransactionUrl(
             explorerName: explorers[1],
             transactionId:
             "813d80363c09b1c4d3f0c6ce3382a048b320edefb573a8aedbc7ddd4c65cf7e4"
         )
 
-        #expect(txUrl == "https://mempool.space/tx/813d80363c09b1c4d3f0c6ce3382a048b320edefb573a8aedbc7ddd4c65cf7e4")
+        #expect(transactionUrl == "https://mempool.space/tx/813d80363c09b1c4d3f0c6ce3382a048b320edefb573a8aedbc7ddd4c65cf7e4")
     }
 
     @Test

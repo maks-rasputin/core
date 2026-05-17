@@ -1,4 +1,4 @@
-use primitives::{SignerError, TransactionLoadInput, TransactionLoadMetadata};
+use primitives::{SignerError, TransactionLoadInput, TransactionLoadMetadata, hex::decode_hex_array};
 use signer::Ed25519KeyPair;
 
 use crate::address::PolkadotAddress;
@@ -86,7 +86,7 @@ impl NativeTransferTransaction {
 }
 
 struct NativeTransferParameters {
-    sequence: u32,
+    sequence: u64,
     spec_version: u32,
     era: MortalEra,
     signing_payload: NativeTransferSigningPayload,
@@ -94,24 +94,27 @@ struct NativeTransferParameters {
 
 impl NativeTransferParameters {
     fn from_input(input: &TransactionLoadInput) -> Result<Self, SignerError> {
+        let sequence = input.metadata.get_sequence()?;
         let TransactionLoadMetadata::Polkadot {
-            sequence,
             genesis_hash,
             block_hash,
             block_number,
             spec_version,
             transaction_version,
             period,
+            ..
         } = &input.metadata
         else {
             return SignerError::invalid_input_err("missing Polkadot metadata");
         };
 
+        let spec_version = u32::try_from(*spec_version).map_err(SignerError::from_display)?;
+
         let parameters = Self {
-            sequence: to_u32(*sequence, "Polkadot sequence")?,
-            spec_version: to_u32(*spec_version, "Polkadot spec version")?,
+            sequence,
+            spec_version,
             era: MortalEra::new(*period, *block_number)?,
-            signing_payload: NativeTransferSigningPayload::new(genesis_hash, block_hash, *spec_version, *transaction_version)?,
+            signing_payload: NativeTransferSigningPayload::new(genesis_hash, block_hash, spec_version, *transaction_version)?,
         };
 
         Ok(parameters)
@@ -170,12 +173,12 @@ struct NativeTransferSigningPayload {
 }
 
 impl NativeTransferSigningPayload {
-    fn new(genesis_hash: &str, block_hash: &str, spec_version: u64, transaction_version: u64) -> Result<Self, SignerError> {
+    fn new(genesis_hash: &str, block_hash: &str, spec_version: u32, transaction_version: u64) -> Result<Self, SignerError> {
         Ok(Self {
-            spec_version: to_u32(spec_version, "Polkadot spec version")?,
-            transaction_version: to_u32(transaction_version, "Polkadot transaction version")?,
-            genesis_hash: decode_hash(genesis_hash, "Polkadot genesis hash")?,
-            block_hash: decode_hash(block_hash, "Polkadot block hash")?,
+            spec_version,
+            transaction_version: u32::try_from(transaction_version).map_err(SignerError::from_display)?,
+            genesis_hash: decode_hex_array(genesis_hash)?,
+            block_hash: decode_hex_array(block_hash)?,
         })
     }
 
@@ -244,16 +247,6 @@ fn encode_compact_integer(value: u128, output: &mut Vec<u8>) {
         output.push(0b11 | (((bytes_needed - 4) as u8) << 2));
         output.extend_from_slice(&bytes[..bytes_needed]);
     }
-}
-
-fn decode_hash(value: &str, name: &'static str) -> Result<[u8; 32], SignerError> {
-    let value = value.strip_prefix("0x").unwrap_or(value);
-    let bytes = hex::decode(value).map_err(SignerError::from_display)?;
-    bytes.try_into().map_err(|_| SignerError::invalid_input(format!("{name} must be 32 bytes")))
-}
-
-fn to_u32(value: u64, name: &'static str) -> Result<u32, SignerError> {
-    value.try_into().map_err(|_| SignerError::invalid_input(format!("{name} does not fit u32")))
 }
 
 #[cfg(test)]

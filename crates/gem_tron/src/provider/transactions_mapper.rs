@@ -1,24 +1,16 @@
 use chrono::DateTime;
 use num_bigint::BigUint;
-use num_traits::Num;
-use primitives::{AssetId, Transaction, TransactionResourceTypeMetadata, TransactionState, TransactionType, chain::Chain, stake_type::Resource};
+use primitives::{
+    Address as _, AssetId, Transaction, TransactionResourceTypeMetadata, TransactionState, TransactionType, chain::Chain, decode_hex, hex::decode_hex_utf8, stake_type::Resource,
+};
 use std::error::Error;
 
 use crate::address::TronAddress;
-use crate::models::{BlockTransactions, Transaction as TronTransaction, TransactionReceiptData, TronTransactionBroadcast};
+use crate::models::{BlockTransactions, Transaction as TronTransaction, TransactionReceiptData, TronContractType, TronTransactionBroadcast};
 use crate::rpc::constants::ERC20_TRANSFER_EVENT_SIGNATURE;
 
-const TRANSFER_CONTRACT: &str = "TransferContract";
-const TRIGGER_SMART_CONTRACT: &str = "TriggerSmartContract";
-const FREEZE_BALANCE_V2_CONTRACT: &str = "FreezeBalanceV2Contract";
-const UNFREEZE_BALANCE_V2_CONTRACT: &str = "UnfreezeBalanceV2Contract";
-const VOTE_WITNESS_CONTRACT: &str = "VoteWitnessContract";
-
 fn decode_hex_message(hex_str: &str) -> String {
-    match hex::decode(hex_str) {
-        Ok(bytes) => String::from_utf8(bytes).unwrap_or_else(|_| hex_str.to_string()),
-        Err(_) => hex_str.to_string(),
-    }
+    decode_hex_utf8(hex_str).unwrap_or_else(|| hex_str.to_string())
 }
 
 fn resource_type_metadata(resource: Option<String>) -> Option<serde_json::Value> {
@@ -44,22 +36,22 @@ pub fn map_transactions_by_block(chain: Chain, block: BlockTransactions, receipt
     block
         .transactions
         .into_iter()
-        .zip(receipts.iter())
-        .filter_map(|(transaction, receipt)| map_transaction(chain, transaction, receipt.clone()))
+        .zip(receipts)
+        .filter_map(|(transaction, receipt)| map_transaction(chain, transaction, receipt))
         .collect()
 }
 
 pub fn map_transactions_by_address(transactions: Vec<TronTransaction>, receipts: Vec<TransactionReceiptData>) -> Vec<Transaction> {
     transactions
         .into_iter()
-        .zip(receipts.iter())
-        .filter_map(|(transaction, receipt)| map_transaction(Chain::Tron, transaction, receipt.clone()))
+        .zip(receipts)
+        .filter_map(|(transaction, receipt)| map_transaction(Chain::Tron, transaction, receipt))
         .collect()
 }
 
 pub fn map_transaction(chain: Chain, transaction: TronTransaction, receipt: TransactionReceiptData) -> Option<Transaction> {
     if let (Some(value), Some(contract_result)) = (transaction.raw_data.contract.first().cloned(), transaction.ret.first().cloned()) {
-        let state: TransactionState = if contract_result.contract_ret.clone() == "SUCCESS" {
+        let state: TransactionState = if contract_result.contract_ret == "SUCCESS" {
             TransactionState::Confirmed
         } else {
             TransactionState::Failed
@@ -71,34 +63,35 @@ pub fn map_transaction(chain: Chain, transaction: TronTransaction, receipt: Tran
         let contract_value = value.parameter.value;
         let from = contract_value.owner_address.unwrap_or_default();
 
-        if let Some((transaction_type, to, amount, metadata)) = match value.contract_type.as_str() {
-            TRANSFER_CONTRACT if !transaction.ret.is_empty() => {
+        let contract_type = value.contract_type;
+        if let Some((transaction_type, to, amount, metadata)) = match contract_type {
+            Some(TronContractType::Transfer) if !transaction.ret.is_empty() => {
                 let to = contract_value.to_address.unwrap_or_default();
                 Some((TransactionType::Transfer, to, contract_value.amount.unwrap_or_default().to_string(), None))
             }
-            FREEZE_BALANCE_V2_CONTRACT => Some((
+            Some(TronContractType::FreezeBalanceV2) => Some((
                 TransactionType::StakeFreeze,
                 from.clone(),
                 contract_value.frozen_balance.unwrap_or_default().to_string(),
                 resource_type_metadata(contract_value.resource.clone()),
             )),
-            UNFREEZE_BALANCE_V2_CONTRACT => Some((
+            Some(TronContractType::UnfreezeBalanceV2) => Some((
                 TransactionType::StakeUnfreeze,
                 from.clone(),
                 contract_value.unfreeze_balance.unwrap_or_default().to_string(),
                 resource_type_metadata(contract_value.resource.clone()),
             )),
-            VOTE_WITNESS_CONTRACT => {
+            Some(TronContractType::VoteWitness) => {
                 let votes = contract_value.votes.as_ref()?;
                 let vote = votes.first()?;
-                let to = TronAddress::from_hex(vote.vote_address.as_str()).unwrap_or_default();
+                let to = TronAddress::from_hex(vote.vote_address.as_str())?.encode();
                 let amount = vote.vote_count * 1_000_000;
                 Some((TransactionType::StakeDelegate, to, amount.to_string(), None))
             }
             _ => None,
         } {
             let transaction = Transaction::new(
-                transaction.tx_id,
+                transaction.transaction_id,
                 chain.as_asset_id(),
                 from,
                 to,
@@ -115,22 +108,23 @@ pub fn map_transaction(chain: Chain, transaction: TronTransaction, receipt: Tran
             return Some(transaction);
         }
         let logs = receipt.log.unwrap_or_default();
-        if value.contract_type == TRIGGER_SMART_CONTRACT
-            && logs.len() == 1
-            && logs.first()?.topics.clone().unwrap_or_default().len() == 3
-            && logs.first()?.topics.clone().unwrap_or_default().first()? == ERC20_TRANSFER_EVENT_SIGNATURE
-        {
+        if contract_type == Some(TronContractType::TriggerSmart) && logs.len() == 1 {
             let log = logs.first()?;
-            let from_string = format!("41{}", log.topics.clone().unwrap_or_default()[1].clone().chars().skip(24).collect::<String>());
-            let to_string = format!("41{}", log.topics.clone().unwrap_or_default()[2].clone().chars().skip(24).collect::<String>());
+            let topics = log.topics.as_ref()?;
+            if topics.len() != 3 || topics.first()?.as_str() != ERC20_TRANSFER_EVENT_SIGNATURE {
+                return None;
+            }
+
+            let from_string = format!("41{}", topics[1].chars().skip(24).collect::<String>());
+            let to_string = format!("41{}", topics[2].chars().skip(24).collect::<String>());
             let token_id = contract_value.contract_address?;
-            let from = TronAddress::from_hex(from_string.as_str()).unwrap_or_default();
-            let to = TronAddress::from_hex(to_string.as_str()).unwrap_or_default();
-            let value = BigUint::from_str_radix(&log.data.clone().unwrap_or_default(), 16).unwrap();
+            let from = TronAddress::from_hex(from_string.as_str())?.encode();
+            let to = TronAddress::from_hex(to_string.as_str())?.encode();
+            let value = BigUint::from_bytes_be(&decode_hex(log.data.as_deref()?).ok()?);
             let asset_id = AssetId { chain, token_id: Some(token_id) };
 
             let transaction = Transaction::new(
-                transaction.tx_id,
+                transaction.transaction_id,
                 asset_id,
                 from,
                 to,
@@ -204,11 +198,11 @@ mod tests {
 
         let result = map_transaction(Chain::Tron, transaction, receipt);
         assert!(result.is_some());
-        let tx = result.unwrap();
-        assert_eq!(tx.transaction_type, TransactionType::StakeFreeze);
-        assert_eq!(tx.value, "100000000");
-        assert_eq!(tx.from, tx.to);
-        assert_eq!(tx.metadata, serde_json::to_value(TransactionResourceTypeMetadata::new(Resource::Bandwidth)).ok());
+        let transaction = result.unwrap();
+        assert_eq!(transaction.transaction_type, TransactionType::StakeFreeze);
+        assert_eq!(transaction.value, "100000000");
+        assert_eq!(transaction.from, transaction.to);
+        assert_eq!(transaction.metadata, serde_json::to_value(TransactionResourceTypeMetadata::new(Resource::Bandwidth)).ok());
     }
 
     #[test]
@@ -227,11 +221,11 @@ mod tests {
 
         let result = map_transaction(Chain::Tron, transaction, receipt);
         assert!(result.is_some());
-        let tx = result.unwrap();
-        assert_eq!(tx.transaction_type, TransactionType::StakeFreeze);
-        assert_eq!(tx.value, "10000000");
-        assert_eq!(tx.from, tx.to);
-        assert_eq!(tx.metadata, serde_json::to_value(TransactionResourceTypeMetadata::new(Resource::Energy)).ok());
+        let transaction = result.unwrap();
+        assert_eq!(transaction.transaction_type, TransactionType::StakeFreeze);
+        assert_eq!(transaction.value, "10000000");
+        assert_eq!(transaction.from, transaction.to);
+        assert_eq!(transaction.metadata, serde_json::to_value(TransactionResourceTypeMetadata::new(Resource::Energy)).ok());
     }
 
     #[test]
@@ -250,11 +244,11 @@ mod tests {
 
         let result = map_transaction(Chain::Tron, transaction, receipt);
         assert!(result.is_some());
-        let tx = result.unwrap();
-        assert_eq!(tx.transaction_type, TransactionType::StakeDelegate);
-        assert_eq!(tx.value, "2125000000");
-        assert_eq!(tx.from, "TEB39Rt69QkgD1BKhqaRNqGxfQzCarkRCb");
-        assert_eq!(tx.to, "TJvaAeFb8Lykt9RQcVyyTFN2iDvGMuyD4M");
+        let transaction = result.unwrap();
+        assert_eq!(transaction.transaction_type, TransactionType::StakeDelegate);
+        assert_eq!(transaction.value, "2125000000");
+        assert_eq!(transaction.from, "TEB39Rt69QkgD1BKhqaRNqGxfQzCarkRCb");
+        assert_eq!(transaction.to, "TJvaAeFb8Lykt9RQcVyyTFN2iDvGMuyD4M");
     }
 
     #[test]
@@ -273,11 +267,11 @@ mod tests {
 
         let result = map_transaction(Chain::Tron, transaction, receipt);
         assert!(result.is_some());
-        let tx = result.unwrap();
-        assert_eq!(tx.transaction_type, TransactionType::StakeUnfreeze);
-        assert_eq!(tx.value, "100000000");
-        assert_eq!(tx.from, tx.to);
-        assert_eq!(tx.metadata, serde_json::to_value(TransactionResourceTypeMetadata::new(Resource::Bandwidth)).ok());
+        let transaction = result.unwrap();
+        assert_eq!(transaction.transaction_type, TransactionType::StakeUnfreeze);
+        assert_eq!(transaction.value, "100000000");
+        assert_eq!(transaction.from, transaction.to);
+        assert_eq!(transaction.metadata, serde_json::to_value(TransactionResourceTypeMetadata::new(Resource::Bandwidth)).ok());
     }
 
     #[test]
@@ -287,11 +281,11 @@ mod tests {
 
         let result = map_transaction(Chain::Tron, transaction, receipt);
         assert!(result.is_some());
-        let tx = result.unwrap();
-        assert_eq!(tx.hash, TEST_TRANSACTION_ID);
-        assert_eq!(tx.transaction_type, TransactionType::Transfer);
-        assert_eq!(tx.value, "25000000");
-        assert_ne!(tx.from, tx.to);
+        let transaction = result.unwrap();
+        assert_eq!(transaction.hash, TEST_TRANSACTION_ID);
+        assert_eq!(transaction.transaction_type, TransactionType::Transfer);
+        assert_eq!(transaction.value, "25000000");
+        assert_ne!(transaction.from, transaction.to);
     }
 
     #[test]
@@ -317,9 +311,9 @@ mod tests {
 
         let result = map_transaction(Chain::Tron, transaction, receipt);
         assert!(result.is_some());
-        let tx = result.unwrap();
-        assert_eq!(tx.transaction_type, TransactionType::Transfer);
-        assert_ne!(tx.from, tx.to);
+        let transaction = result.unwrap();
+        assert_eq!(transaction.transaction_type, TransactionType::Transfer);
+        assert_ne!(transaction.from, transaction.to);
     }
 
     #[test]
@@ -336,9 +330,9 @@ mod tests {
             log: None,
         };
 
-        let tx = map_transaction(Chain::Tron, transaction, receipt).unwrap();
-        assert_eq!(tx.transaction_type, TransactionType::Transfer);
-        assert_eq!(tx.value, "200000000");
-        assert_eq!(tx.memo.as_deref(), Some("=:TRON.USDT:TNAwd1WFe7GHTxovGU9MeT6mi3J4KAZMvP:0/1/0:g1:50"));
+        let transaction = map_transaction(Chain::Tron, transaction, receipt).unwrap();
+        assert_eq!(transaction.transaction_type, TransactionType::Transfer);
+        assert_eq!(transaction.value, "200000000");
+        assert_eq!(transaction.memo.as_deref(), Some("=:TRON.USDT:TNAwd1WFe7GHTxovGU9MeT6mi3J4KAZMvP:0/1/0:g1:50"));
     }
 }

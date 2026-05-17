@@ -41,7 +41,8 @@ fn sign_payment(input: &SignerInput, private_key: &[u8], amount: XrpAmount, dest
 }
 
 fn params(input: &SignerInput, private_key: &[u8]) -> Result<XrpTransactionParams, SignerError> {
-    let block_number = input.metadata.get_block_number().map_err(SignerError::from_display)?;
+    let block_number = input.metadata.get_block_number()?;
+    let sequence = input.metadata.get_sequence()?;
     let last_ledger_sequence = block_number
         .checked_add(LEDGER_SEQUENCE_OFFSET)
         .ok_or_else(|| SignerError::invalid_input("XRP last ledger sequence overflow"))?;
@@ -49,8 +50,8 @@ fn params(input: &SignerInput, private_key: &[u8]) -> Result<XrpTransactionParam
     Ok(XrpTransactionParams {
         account: XrpAddress::parse(&input.sender_address)?,
         fee: input.fee.fee.to_u64().ok_or_else(|| SignerError::invalid_input("invalid XRP fee"))?,
-        sequence: to_u32(input.metadata.get_sequence().map_err(SignerError::from_display)?, "XRP sequence")?,
-        last_ledger_sequence: to_u32(last_ledger_sequence, "XRP last ledger sequence")?,
+        sequence: u32::try_from(sequence).map_err(SignerError::from_display)?,
+        last_ledger_sequence: u32::try_from(last_ledger_sequence).map_err(SignerError::from_display)?,
         signing_pub_key: ::signer::secp256k1_public_key(private_key)?,
     })
 }
@@ -68,8 +69,8 @@ fn payment_memo(memo: Option<&str>) -> Result<XrpPaymentMemo, SignerError> {
 
     match memo.parse::<u64>() {
         Ok(0) => Ok(XrpPaymentMemo::None),
-        Ok(value) => Ok(XrpPaymentMemo::DestinationTag(to_u32(value, "XRP destination tag")?)),
-        Err(_) => Ok(XrpPaymentMemo::Memo(memo_bytes(memo))),
+        Ok(value) => Ok(XrpPaymentMemo::DestinationTag(u32::try_from(value).map_err(SignerError::from_display)?)),
+        Err(_) => Ok(XrpPaymentMemo::Memo(memo.strip_prefix("0x").unwrap_or(memo).as_bytes().to_vec())),
     }
 }
 
@@ -80,7 +81,7 @@ fn token_memo(memo: Option<&str>) -> Result<XrpPaymentMemo, SignerError> {
 
     match memo.parse::<u64>() {
         Ok(0) | Err(_) => Ok(XrpPaymentMemo::None),
-        Ok(value) => Ok(XrpPaymentMemo::DestinationTag(to_u32(value, "XRP destination tag")?)),
+        Ok(value) => Ok(XrpPaymentMemo::DestinationTag(u32::try_from(value).map_err(SignerError::from_display)?)),
     }
 }
 
@@ -92,14 +93,6 @@ fn swap_memo(data: &SwapQuoteData) -> XrpPaymentMemo {
         return XrpPaymentMemo::None;
     }
     XrpPaymentMemo::Memo(data.data.as_bytes().to_vec())
-}
-
-fn memo_bytes(memo: &str) -> Vec<u8> {
-    memo.strip_prefix("0x").unwrap_or(memo).as_bytes().to_vec()
-}
-
-fn to_u32(value: u64, name: &'static str) -> Result<u32, SignerError> {
-    value.try_into().map_err(|_| SignerError::invalid_input(format!("{name} does not fit u32")))
 }
 
 #[cfg(test)]

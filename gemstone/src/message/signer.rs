@@ -8,7 +8,7 @@ use gem_sui::signer as sui_signer;
 use gem_ton::address::base64_to_hex_address;
 use gem_ton::signer::{TonSignDataResponse, TonSignMessageData, TonSignResult, TonSigner};
 use primitives::hex::encode_with_0x;
-use signer::{SIGNATURE_LENGTH, SignatureScheme, Signer, apply_eth_recovery_id, hash_eip712};
+use signer::{SIGNATURE_LENGTH, SignatureScheme, Signer, ensure_ethereum_signature_recovery_id_offset, hash_eip712};
 use std::time::{SystemTime, UNIX_EPOCH};
 use sui_types::PersonalMessage;
 
@@ -147,7 +147,7 @@ impl MessageSigner {
                     return encode_with_0x(data);
                 }
                 let mut signature = data.to_vec();
-                apply_eth_recovery_id(&mut signature);
+                ensure_ethereum_signature_recovery_id_offset(&mut signature);
                 encode_with_0x(&signature)
             }
             SignDigestType::SuiPersonal | SignDigestType::TonPersonal => BASE64.encode(data),
@@ -168,7 +168,7 @@ impl MessageSigner {
             }
             SignDigestType::Eip191 | SignDigestType::Eip712 | SignDigestType::Siwe | SignDigestType::TronPersonal => {
                 let hash = self.hash()?;
-                let signature = Signer::sign_eth_digest(&hash, &private_key)?;
+                let signature = Signer::sign_ethereum_digest(&hash, &private_key)?;
                 Ok(encode_with_0x(&signature))
             }
             SignDigestType::Base58 => {
