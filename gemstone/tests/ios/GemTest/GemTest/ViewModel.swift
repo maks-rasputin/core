@@ -1,6 +1,5 @@
 // Copyright (c). Gem Wallet. All rights reserved.
 
-import BigInt
 import Foundation
 import Gemstone
 
@@ -9,10 +8,7 @@ public struct ViewModel: Sendable {
 
     public func fetchQuote(_ request: SwapperQuoteRequest) async throws {
         let swapper = GemSwapper(rpcProvider: self.provider)
-        var quotes = try await swapper.getQuote(request: request)
-        quotes = quotes.sorted(by: { lhs, rhs in
-            BigInt(lhs.toValue)! > BigInt(rhs.toValue)!
-        })
+        let quotes = try await swapper.getQuote(request: request)
         print("<== quotes: \(quotes.count)")
         guard
             let quote = quotes.first,

@@ -14,15 +14,13 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(path: "../Packages/Gemstone"),
-        .package(url: "https://github.com/attaswift/BigInt.git", from: "5.1.0")
+        .package(path: "../Packages/Gemstone")
     ],
     targets: [
         .target(
             name: "GemTest",
             dependencies: [
-                .product(name: "Gemstone", package: "Gemstone"),
-                .product(name: "BigInt", package: "BigInt")
+                .product(name: "Gemstone", package: "Gemstone")
             ],
             path: "GemTest",
             exclude: [
