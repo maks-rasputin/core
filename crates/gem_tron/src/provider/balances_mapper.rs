@@ -1,10 +1,11 @@
+use std::error::Error;
+
 use num_bigint::BigUint;
 use primitives::{
-    AssetBalance, AssetId, Chain,
+    AssetBalance, AssetId, Chain, Resource,
     asset_balance::{Balance, BalanceMetadata},
     decode_hex,
 };
-use std::error::Error;
 
 use crate::models::{TronAccount, TronAccountUsage, TronReward};
 
@@ -36,12 +37,16 @@ pub fn map_metadata_from_usage(usage: &TronAccountUsage, votes: u32) -> BalanceM
 }
 
 pub fn map_staking_balance(account: &TronAccount, reward: &TronReward, usage: &TronAccountUsage) -> Result<AssetBalance, Box<dyn Error + Sync + Send>> {
-    let (bandwidth_frozen, energy_frozen) = account.frozen_v2.as_ref().map_or((0, 0), |frozen_list| {
-        frozen_list.iter().fold((0u64, 0u64), |(bandwidth, energy), frozen| match frozen.frozen_type.as_deref() {
-            Some("ENERGY") => (bandwidth, energy + frozen.amount),
-            _ => (bandwidth + frozen.amount, energy),
-        })
-    });
+    let (bandwidth_frozen, energy_frozen) = account
+        .frozen_v2
+        .as_deref()
+        .unwrap_or_default()
+        .iter()
+        .fold((0u64, 0u64), |(bandwidth, energy), frozen| match frozen.resource() {
+            Some(Resource::Bandwidth) => (bandwidth + frozen.amount, energy),
+            Some(Resource::Energy) => (bandwidth, energy + frozen.amount),
+            None => (bandwidth, energy),
+        });
     let votes: u64 = account.votes.as_ref().map_or(0, |votes| votes.iter().map(|vote| vote.vote_count).sum());
     let pending_amount: u64 = account
         .unfrozen_v2
@@ -179,6 +184,14 @@ mod tests {
                 TronFrozen {
                     frozen_type: Some("ENERGY".to_string()),
                     amount: 3000000,
+                },
+                TronFrozen {
+                    frozen_type: Some("TRON_POWER".to_string()),
+                    amount: 4000000,
+                },
+                TronFrozen {
+                    frozen_type: Some("UNKNOWN".to_string()),
+                    amount: 6000000,
                 },
             ]),
             unfrozen_v2: Some(vec![TronUnfrozen {

@@ -7,7 +7,7 @@ use crate::models::ChainParameter;
 use crate::models::TronAccountUsage;
 use crate::models::account::{TronAccount, TronFrozen};
 use crate::rpc::constants::{DEFAULT_BANDWIDTH_BYTES, GET_CREATE_ACCOUNT_FEE, GET_CREATE_NEW_ACCOUNT_FEE_IN_SYSTEM_CONTRACT, GET_ENERGY_FEE, GET_MEMO_FEE, GET_TRANSACTION_FEE};
-use primitives::{Resource, StakeType, TronStakeData, TronUnfreeze, TronVote};
+use primitives::{StakeType, TronStakeData, TronUnfreeze, TronVote};
 
 const FEE_LIMIT_BUFFER_PERCENT: u64 = 20;
 
@@ -91,23 +91,18 @@ fn get_chain_parameter_value(parameters: &[ChainParameter], key: &str) -> Result
         .ok_or_else(|| format!("Missing chain parameter: {}", key).into())
 }
 
-pub fn calculate_unfreeze_amounts(frozen: Option<&Vec<TronFrozen>>, total: u64) -> Vec<TronUnfreeze> {
+fn calculate_unfreeze_amounts(frozen: Option<&[TronFrozen]>, total: u64) -> Vec<TronUnfreeze> {
     frozen
         .map(|frozen| {
             frozen
                 .iter()
-                .filter(|f| f.amount > 0)
-                .scan(total, |remaining, f| {
+                .filter_map(|frozen| frozen.resource().map(|resource| (resource, frozen.amount)))
+                .filter(|(_, amount)| *amount > 0)
+                .scan(total, |remaining, (resource, amount)| {
                     (*remaining > 0).then(|| {
-                        let take = (*remaining).min(f.amount);
+                        let take = (*remaining).min(amount);
                         *remaining -= take;
-                        TronUnfreeze {
-                            resource: match f.frozen_type.as_deref() {
-                                Some("ENERGY") => Resource::Energy,
-                                _ => Resource::Bandwidth,
-                            },
-                            amount: take,
-                        }
+                        TronUnfreeze { resource, amount: take }
                     })
                 })
                 .collect()
@@ -115,7 +110,7 @@ pub fn calculate_unfreeze_amounts(frozen: Option<&Vec<TronFrozen>>, total: u64) 
         .unwrap_or_default()
 }
 
-pub fn map_stake_data(account: &TronAccount, stake_type: &StakeType, raw_amount: u64, vote_amount: u64) -> TronStakeData {
+pub fn map_stake_data(account: &TronAccount, stake_type: &StakeType, raw_amount: u64, vote_amount: u64) -> Result<TronStakeData, Box<dyn Error + Send + Sync>> {
     let mut votes: HashMap<String, u64> = account
         .votes
         .as_ref()
@@ -130,7 +125,7 @@ pub fn map_stake_data(account: &TronAccount, stake_type: &StakeType, raw_amount:
                 .and_modify(|value| *value = value.saturating_sub(vote_amount));
             votes.retain(|_, value| *value > 0);
             if votes.is_empty() {
-                return TronStakeData::Unfreeze(calculate_unfreeze_amounts(account.frozen_v2.as_ref(), raw_amount));
+                return Ok(TronStakeData::Unfreeze(calculate_unfreeze_amounts(account.frozen_v2.as_deref(), raw_amount)));
             }
         }
         StakeType::Redelegate(data) => {
@@ -141,20 +136,31 @@ pub fn map_stake_data(account: &TronAccount, stake_type: &StakeType, raw_amount:
         }
         StakeType::Rewards(_) | StakeType::Withdraw(_) | StakeType::Freeze(_) => {}
         StakeType::Unfreeze(resource) => {
-            return TronStakeData::Unfreeze(vec![TronUnfreeze {
+            let available = account
+                .frozen_v2
+                .as_deref()
+                .unwrap_or_default()
+                .iter()
+                .filter(|frozen| frozen.resource().is_some_and(|frozen_resource| &frozen_resource == resource))
+                .map(|frozen| frozen.amount)
+                .sum::<u64>();
+            if raw_amount > available {
+                return Err(format!("Insufficient frozen {} balance: requested {}, available {}", resource.as_ref(), raw_amount, available).into());
+            }
+            return Ok(TronStakeData::Unfreeze(vec![TronUnfreeze {
                 resource: resource.clone(),
                 amount: raw_amount,
-            }]);
+            }]));
         }
     }
 
-    TronStakeData::Votes(
+    Ok(TronStakeData::Votes(
         votes
             .into_iter()
             .filter(|(_, count)| *count > 0)
             .map(|(validator, count)| TronVote { validator, count })
             .collect(),
-    )
+    ))
 }
 
 impl TronAccountUsage {
@@ -181,7 +187,7 @@ impl TronAccountUsage {
 mod tests {
     use super::*;
     use crate::models::account::{TronAccount, TronFrozen, TronVote as AccountVote};
-    use primitives::{Chain, Delegation, DelegationValidator};
+    use primitives::{Chain, Delegation, DelegationValidator, Resource};
 
     fn chain_parameter(key: &str, value: i64) -> ChainParameter {
         ChainParameter {
@@ -371,6 +377,15 @@ mod tests {
     fn test_calculate_unfreeze_amounts() {
         let frozen = vec![
             TronFrozen {
+                frozen_type: Some("TRON_POWER".to_string()),
+                amount: 1_000,
+            },
+            TronFrozen {
+                frozen_type: Some("UNKNOWN".to_string()),
+                amount: 1_000,
+            },
+            TronFrozen { frozen_type: None, amount: 40 },
+            TronFrozen {
                 frozen_type: Some("ENERGY".to_string()),
                 amount: 100,
             },
@@ -384,29 +399,52 @@ mod tests {
             calculate_unfreeze_amounts(Some(&frozen), 120),
             vec![
                 TronUnfreeze {
-                    resource: Resource::Energy,
-                    amount: 100
+                    resource: Resource::Bandwidth,
+                    amount: 40
                 },
                 TronUnfreeze {
-                    resource: Resource::Bandwidth,
-                    amount: 20
+                    resource: Resource::Energy,
+                    amount: 80
                 },
             ]
         );
         assert_eq!(
             calculate_unfreeze_amounts(Some(&frozen), 50),
-            vec![TronUnfreeze {
-                resource: Resource::Energy,
-                amount: 50
-            },]
+            vec![
+                TronUnfreeze {
+                    resource: Resource::Bandwidth,
+                    amount: 40
+                },
+                TronUnfreeze {
+                    resource: Resource::Energy,
+                    amount: 10
+                },
+            ]
         );
         assert!(calculate_unfreeze_amounts(None, 100).is_empty());
         assert!(calculate_unfreeze_amounts(Some(&frozen), 0).is_empty());
     }
 
     #[test]
-    fn test_map_stake_data_unfreeze_uses_raw_amount() {
-        let result = map_stake_data(&TronAccount::mock_with_staking(None, None), &StakeType::Unfreeze(Resource::Bandwidth), 1_500_000, 1);
+    fn test_map_stake_data_unfreeze_uses_raw_amount_when_available() {
+        let account = TronAccount::mock_with_staking(
+            None,
+            Some(vec![TronFrozen {
+                frozen_type: Some("BANDWIDTH".to_string()),
+                amount: 1_500_000,
+            }]),
+        );
+        let result = map_stake_data(&account, &StakeType::Unfreeze(Resource::Bandwidth), 1_000_000, 1).unwrap();
+
+        assert_eq!(
+            result,
+            TronStakeData::Unfreeze(vec![TronUnfreeze {
+                resource: Resource::Bandwidth,
+                amount: 1_000_000,
+            }])
+        );
+
+        let result = map_stake_data(&account, &StakeType::Unfreeze(Resource::Bandwidth), 1_500_000, 1).unwrap();
 
         assert_eq!(
             result,
@@ -414,6 +452,39 @@ mod tests {
                 resource: Resource::Bandwidth,
                 amount: 1_500_000,
             }])
+        );
+    }
+
+    #[test]
+    fn test_map_stake_data_unfreeze_rejects_wrong_resource() {
+        let account = TronAccount::mock_with_staking(
+            None,
+            Some(vec![TronFrozen {
+                frozen_type: Some("ENERGY".to_string()),
+                amount: 2_000_000,
+            }]),
+        );
+
+        let result = map_stake_data(&account, &StakeType::Unfreeze(Resource::Bandwidth), 1_000_000, 1);
+
+        assert_eq!(result.unwrap_err().to_string(), "Insufficient frozen bandwidth balance: requested 1000000, available 0");
+    }
+
+    #[test]
+    fn test_map_stake_data_unfreeze_rejects_excess_amount() {
+        let account = TronAccount::mock_with_staking(
+            None,
+            Some(vec![TronFrozen {
+                frozen_type: Some("BANDWIDTH".to_string()),
+                amount: 999_999,
+            }]),
+        );
+
+        let result = map_stake_data(&account, &StakeType::Unfreeze(Resource::Bandwidth), 1_000_000, 1);
+
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "Insufficient frozen bandwidth balance: requested 1000000, available 999999"
         );
     }
 
@@ -430,7 +501,8 @@ mod tests {
             &StakeType::Unstake(Delegation::mock_tron("validator")),
             2_000_000,
             2,
-        );
+        )
+        .unwrap();
 
         assert_eq!(
             result,
@@ -463,7 +535,8 @@ mod tests {
             &StakeType::Unstake(Delegation::mock_tron("validator")),
             120,
             2,
-        );
+        )
+        .unwrap();
 
         assert_eq!(
             result,

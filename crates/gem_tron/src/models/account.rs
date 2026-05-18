@@ -1,3 +1,4 @@
+use primitives::Resource;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -81,6 +82,15 @@ pub struct TronFrozen {
     pub frozen_type: Option<String>,
     #[serde(default)]
     pub amount: u64,
+}
+
+impl TronFrozen {
+    pub(crate) fn resource(&self) -> Option<Resource> {
+        match self.frozen_type.as_deref() {
+            None => Some(Resource::Bandwidth),
+            Some(resource) => resource.parse().ok(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

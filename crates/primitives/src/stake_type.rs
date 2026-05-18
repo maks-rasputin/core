@@ -14,7 +14,7 @@ pub struct RedelegateData {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, AsRefStr, EnumString)]
 #[typeshare(swift = "Equatable, Sendable, Hashable")]
 #[serde(rename_all = "camelCase")]
-#[strum(serialize_all = "camelCase")]
+#[strum(serialize_all = "camelCase", ascii_case_insensitive)]
 pub enum Resource {
     Bandwidth,
     Energy,
@@ -53,4 +53,15 @@ pub struct TronUnfreeze {
 pub enum TronStakeData {
     Votes(Vec<TronVote>),
     Unfreeze(Vec<TronUnfreeze>),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resource_parses_tron_resource_names() {
+        assert_eq!("BANDWIDTH".parse::<Resource>().unwrap(), Resource::Bandwidth);
+        assert_eq!("ENERGY".parse::<Resource>().unwrap(), Resource::Energy);
+    }
 }

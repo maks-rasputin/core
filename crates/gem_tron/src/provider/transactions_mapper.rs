@@ -14,11 +14,7 @@ fn decode_hex_message(hex_str: &str) -> String {
 }
 
 fn resource_type_metadata(resource: Option<String>) -> Option<serde_json::Value> {
-    let resource_type = resource
-        .map(|s| s.to_lowercase())
-        .as_deref()
-        .and_then(|s| s.parse::<Resource>().ok())
-        .unwrap_or(Resource::Bandwidth);
+    let resource_type = resource.as_deref().and_then(|resource| resource.parse::<Resource>().ok()).unwrap_or(Resource::Bandwidth);
     serde_json::to_value(TransactionResourceTypeMetadata::new(resource_type)).ok()
 }
 
