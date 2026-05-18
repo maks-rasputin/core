@@ -141,14 +141,14 @@ pub fn map_stake_data(account: &TronAccount, stake_type: &StakeType, raw_amount:
                 .as_deref()
                 .unwrap_or_default()
                 .iter()
-                .filter(|frozen| frozen.resource().is_some_and(|frozen_resource| &frozen_resource == resource))
+                .filter(|frozen| frozen.resource() == Some(*resource))
                 .map(|frozen| frozen.amount)
                 .sum::<u64>();
             if raw_amount > available {
                 return Err(format!("Insufficient frozen {} balance: requested {}, available {}", resource.as_ref(), raw_amount, available).into());
             }
             return Ok(TronStakeData::Unfreeze(vec![TronUnfreeze {
-                resource: resource.clone(),
+                resource: *resource,
                 amount: raw_amount,
             }]));
         }
