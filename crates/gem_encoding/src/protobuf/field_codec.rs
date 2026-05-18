@@ -81,6 +81,19 @@ pub mod optional_varint_u64 {
     }
 }
 
+pub mod varint_u64 {
+    use super::*;
+
+    pub fn decode(value: &mut u64, field: Field<'_>) -> MessageResult<()> {
+        *value = field.varint()?;
+        Ok(())
+    }
+
+    pub fn encode(field_number: u32, value: &u64) -> Vec<u8> {
+        encode_optional_u64_field(field_number, Some(*value))
+    }
+}
+
 pub mod optional_varint_i32 {
     use super::*;
 

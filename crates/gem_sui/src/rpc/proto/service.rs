@@ -26,16 +26,12 @@ proto_decode!(GetServiceInfoResponse {
 
 #[derive(Clone, Debug, Default)]
 pub struct GetEpochRequest {
+    pub epoch: Option<u64>,
     pub read_mask: Option<FieldMask>,
 }
 
-impl GetEpochRequest {
-    pub fn latest() -> Self {
-        Self::default()
-    }
-}
-
 proto_encode!(GetEpochRequest {
+    1 => epoch: optional_varint_u64,
     2 => read_mask: optional_message,
 });
 
@@ -50,7 +46,7 @@ proto_decode!(GetEpochResponse {
 
 #[derive(Clone, Debug, Default)]
 pub struct Epoch {
-    pub epoch: Option<u64>,
+    pub epoch: u64,
     pub system_state: Option<SystemState>,
     pub start: Option<Timestamp>,
     pub end: Option<Timestamp>,
@@ -58,7 +54,7 @@ pub struct Epoch {
 }
 
 proto_decode!(Epoch {
-    1 => epoch: optional_varint_u64,
+    1 => epoch: varint_u64,
     3 => system_state: optional_message,
     6 => start: optional_message,
     7 => end: optional_message,
@@ -68,10 +64,21 @@ proto_decode!(Epoch {
 #[derive(Clone, Debug, Default)]
 pub struct SystemState {
     pub validators: Option<ValidatorSet>,
+    pub parameters: Option<SystemParameters>,
 }
 
 proto_decode!(SystemState {
     4 => validators: optional_message,
+    6 => parameters: optional_message,
+});
+
+#[derive(Clone, Debug, Default)]
+pub struct SystemParameters {
+    pub stake_subsidy_start_epoch: Option<u64>,
+}
+
+proto_decode!(SystemParameters {
+    2 => stake_subsidy_start_epoch: optional_varint_u64,
 });
 
 #[derive(Clone, Debug, Default)]
@@ -86,8 +93,23 @@ proto_decode!(ValidatorSet {
 #[derive(Clone, Debug, Default)]
 pub struct Validator {
     pub address: Option<String>,
+    pub staking_pool: Option<StakingPool>,
 }
 
 proto_decode!(Validator {
     2 => address: optional_string,
+    32 => staking_pool: optional_message,
+});
+
+#[derive(Clone, Debug, Default)]
+pub struct StakingPool {
+    pub id: Option<String>,
+    pub sui_balance: Option<u64>,
+    pub pool_token_balance: Option<u64>,
+}
+
+proto_decode!(StakingPool {
+    1 => id: optional_string,
+    4 => sui_balance: optional_varint_u64,
+    6 => pool_token_balance: optional_varint_u64,
 });

@@ -156,9 +156,10 @@ impl SuiClient {
     }
 
     pub async fn get_gas_price(&self) -> Result<BigInt, Box<dyn Error + Send + Sync>> {
-        let request = GetEpochRequest::latest().with(|request| {
-            request.read_mask = Some(FieldMask::from_path_string("reference_gas_price"));
-        });
+        let request = GetEpochRequest {
+            epoch: None,
+            read_mask: Some(FieldMask::from_path_string("reference_gas_price")),
+        };
         let response: GetEpochResponse = self.grpc_unary(PATH_GET_EPOCH, request).await?;
         let epoch = response.epoch.ok_or("missing Sui epoch")?;
         Ok(BigInt::from(epoch.reference_gas_price.ok_or("missing Sui reference gas price")?))
@@ -326,10 +327,8 @@ impl SuiClient {
         self.grpc_unary(PATH_GET_SERVICE_INFO, GetServiceInfoRequest).await
     }
 
-    pub(super) async fn get_epoch(&self, read_mask: Option<String>) -> Result<proto::Epoch, Box<dyn Error + Send + Sync>> {
-        let request = GetEpochRequest::latest().with(|request| {
-            request.read_mask = read_mask.as_deref().map(FieldMask::from_path_string);
-        });
+    pub(super) async fn get_epoch(&self, epoch: Option<u64>, read_mask: Option<FieldMask>) -> Result<proto::Epoch, Box<dyn Error + Send + Sync>> {
+        let request = GetEpochRequest { epoch, read_mask };
         let response: GetEpochResponse = self.grpc_unary(PATH_GET_EPOCH, request).await?;
         Ok(response.epoch.ok_or("missing Sui epoch")?)
     }

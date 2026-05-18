@@ -1,5 +1,6 @@
 use std::{error::Error, str::FromStr};
 
+use futures::future::try_join_all;
 use num_bigint::BigUint;
 use sui_types::Address;
 
@@ -13,6 +14,15 @@ use crate::models::staking::{SuiStake, SuiStakeDelegation, SuiStakeStatus, SuiSy
 use crate::{SUI_SYSTEM_ID, sui_system_package_address, sui_system_state_object_id};
 
 const STAKED_SUI_TYPE: &str = "0x3::staking_pool::StakedSui";
+const STAKING_APY_EPOCH_COUNT: u64 = 5;
+const STAKING_APY_READ_MASK: &[&str] = &[
+    "epoch",
+    "system_state.parameters.stake_subsidy_start_epoch",
+    "system_state.validators.active_validators.address",
+    "system_state.validators.active_validators.staking_pool.id",
+    "system_state.validators.active_validators.staking_pool.sui_balance",
+    "system_state.validators.active_validators.staking_pool.pool_token_balance",
+];
 
 #[derive(Debug, serde::Deserialize)]
 struct StakedSuiObject {
@@ -56,7 +66,7 @@ impl SuiClient {
     }
 
     pub async fn get_validators(&self) -> Result<SuiValidators, Box<dyn Error + Send + Sync>> {
-        let epoch = self.get_epoch(Some("system_state.validators".to_string())).await?;
+        let epoch = self.get_epoch(None, Some(FieldMask::from_paths(["system_state.validators"]))).await?;
         let apys = epoch
             .system_state
             .and_then(|state| state.validators)
@@ -76,15 +86,33 @@ impl SuiClient {
         Ok(SuiValidators { apys })
     }
 
+    pub(crate) async fn get_validator_apys(&self) -> Result<SuiValidators, Box<dyn Error + Send + Sync>> {
+        let read_mask = FieldMask::from_paths(STAKING_APY_READ_MASK);
+        let latest_epoch = self.get_epoch(None, Some(read_mask.clone())).await?;
+        let current_epoch = latest_epoch.epoch;
+        let stake_subsidy_start_epoch = latest_epoch
+            .system_state
+            .as_ref()
+            .and_then(|state| state.parameters.as_ref())
+            .and_then(|parameters| parameters.stake_subsidy_start_epoch)
+            .unwrap_or_default();
+
+        let start_epoch = current_epoch.saturating_sub(STAKING_APY_EPOCH_COUNT - 1).max(stake_subsidy_start_epoch);
+        let previous_epochs = try_join_all((start_epoch..current_epoch).rev().map(|epoch| self.get_epoch(Some(epoch), Some(read_mask.clone())))).await?;
+        let epochs = std::iter::once(latest_epoch).chain(previous_epochs).collect::<Vec<_>>();
+
+        map_validator_apys(&epochs)
+    }
+
     pub async fn get_system_state(&self) -> Result<SuiSystemState, Box<dyn Error + Send + Sync>> {
-        let epoch = self.get_epoch(Some("epoch,start,end".to_string())).await?;
+        let epoch = self.get_epoch(None, Some(FieldMask::from_paths(["epoch", "start", "end"]))).await?;
         let start_ms = epoch.start.as_ref().map(timestamp_millis).unwrap_or_default().to_string();
         let duration_ms = match (epoch.start.as_ref(), epoch.end.as_ref()) {
             (Some(start), Some(end)) => (timestamp_millis(end) - timestamp_millis(start)).max(0).to_string(),
             _ => "0".to_string(),
         };
         Ok(SuiSystemState {
-            epoch: epoch.epoch.unwrap_or_default().to_string(),
+            epoch: epoch.epoch.to_string(),
             epoch_start_timestamp_ms: start_ms,
             epoch_duration_ms: duration_ms,
         })
@@ -232,5 +260,98 @@ impl SuiClient {
             return Err("Sui staking transaction simulation failed".into());
         }
         Ok(response)
+    }
+}
+
+fn map_validator_apys(epochs: &[proto::Epoch]) -> Result<SuiValidators, Box<dyn Error + Send + Sync>> {
+    let latest_validators = epochs
+        .first()
+        .ok_or("missing Sui epoch")?
+        .system_state
+        .as_ref()
+        .and_then(|state| state.validators.as_ref())
+        .ok_or("missing Sui validators")?;
+
+    let apys = latest_validators
+        .active_validators
+        .iter()
+        .filter_map(|validator| {
+            let address = validator.address.clone()?;
+            let pool_id = validator.staking_pool.as_ref()?.id.as_deref()?;
+            let (total_apy, count) = epochs
+                .windows(2)
+                .filter_map(|window| {
+                    let current_rate = validator_pool_rate(&window[0], pool_id)?;
+                    let previous_rate = validator_pool_rate(&window[1], pool_id)?;
+                    let apy = if current_rate > 0.0 { (previous_rate / current_rate).powf(365.0) - 1.0 } else { 0.0 };
+                    (apy.is_finite() && apy > 0.0 && apy < 0.1).then_some(apy)
+                })
+                .fold((0.0, 0), |(total, count), apy| (total + apy, count + 1));
+
+            let apy = if count == 0 { 0.0 } else { total_apy / count as f64 };
+            Some(SuiValidator { address, apy })
+        })
+        .collect();
+
+    Ok(SuiValidators { apys })
+}
+
+fn validator_pool_rate(epoch: &proto::Epoch, pool_id: &str) -> Option<f64> {
+    let pool = epoch.system_state.as_ref()?.validators.as_ref()?.active_validators.iter().find_map(|validator| {
+        let pool = validator.staking_pool.as_ref()?;
+        (pool.id.as_deref() == Some(pool_id)).then_some(pool)
+    })?;
+
+    match (pool.sui_balance, pool.pool_token_balance) {
+        (Some(0), Some(_)) => Some(1.0),
+        (Some(sui_balance), Some(pool_token_balance)) => Some(pool_token_balance as f64 / sui_balance as f64),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::provider::staking_mapper;
+
+    const APY: f64 = 0.01484661182599185;
+    const POOL_ID: &str = "pool";
+    const SCALE: u64 = 1_000_000_000_000_000;
+    const VALIDATOR_ADDRESS: &str = "validator";
+
+    #[test]
+    fn test_map_validator_apys_from_grpc_epoch_snapshots() {
+        let validators = map_validator_apys(&[
+            proto::Epoch::mock_with_validator_rate(100, 1.0),
+            proto::Epoch::mock_with_validator_rate(99, (1.0 + APY).powf(1.0 / 365.0)),
+        ])
+        .unwrap();
+
+        assert_eq!(validators.apys.len(), 1);
+        assert_eq!(validators.apys[0].address, VALIDATOR_ADDRESS);
+        assert!((validators.apys[0].apy - APY).abs() < 0.000000000001);
+        assert!((staking_mapper::map_staking_apy(validators).unwrap() - APY * 100.0).abs() < 0.000000001);
+    }
+
+    impl proto::Epoch {
+        fn mock_with_validator_rate(epoch: u64, rate: f64) -> Self {
+            Self {
+                epoch,
+                system_state: Some(proto::service::SystemState {
+                    validators: Some(proto::service::ValidatorSet {
+                        active_validators: vec![proto::service::Validator {
+                            address: Some(VALIDATOR_ADDRESS.to_string()),
+                            staking_pool: Some(proto::service::StakingPool {
+                                id: Some(POOL_ID.to_string()),
+                                sui_balance: Some(SCALE),
+                                pool_token_balance: Some((SCALE as f64 * rate).round() as u64),
+                            }),
+                        }],
+                    }),
+                    parameters: None,
+                }),
+                ..Default::default()
+            }
+        }
     }
 }

@@ -13,7 +13,7 @@ use crate::rpc::client::SuiClient;
 #[async_trait]
 impl ChainStaking for SuiClient {
     async fn get_staking_apy(&self) -> Result<Option<f64>, Box<dyn Error + Sync + Send>> {
-        let validators = self.get_validators().await?;
+        let validators = self.get_validator_apys().await?;
         let apy = staking_mapper::map_staking_apy(validators)?;
         Ok(Some(apy))
     }
