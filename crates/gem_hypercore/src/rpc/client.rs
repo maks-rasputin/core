@@ -23,9 +23,17 @@ use primitives::{Chain, Preferences};
 use serde_json::json;
 
 const SPOT_META_CACHE_TTL_SECS: u64 = 3600;
+const USER_ABSTRACTION_CACHE_TTL_SECS: u64 = 3600;
 const EXPLORER_PATH: &str = "/explorer";
 const TRANSACTION_SENDER_CACHE_PREFIX: &str = "hypercore_transaction_sender_";
 pub(crate) const AGENT_OWNER_CACHE_PREFIX: &str = "hypercore_agent_owner_";
+
+fn info_cache_headers(ttl_secs: u64) -> HashMap<String, String> {
+    HashMap::from([
+        (String::from(CONTENT_TYPE), ContentType::ApplicationJson.as_str().to_string()),
+        (String::from(X_CACHE_TTL), ttl_secs.to_string()),
+    ])
+}
 
 fn transaction_sender_cache_key(id: &str) -> String {
     format!("{TRANSACTION_SENDER_CACHE_PREFIX}{id}")
@@ -82,6 +90,13 @@ impl<C: Client> HyperCoreClient<C> {
         T: DeserializeOwned + Send,
     {
         Ok(self.client.post("/info", &payload).await?)
+    }
+
+    async fn info_with_cache<T>(&self, payload: serde_json::Value, ttl_secs: u64) -> Result<T, Box<dyn Error + Send + Sync>>
+    where
+        T: DeserializeOwned + Send,
+    {
+        Ok(self.client.post_with_headers("/info", &payload, info_cache_headers(ttl_secs)).await?)
     }
 
     pub async fn exchange(&self, payload: serde_json::Value) -> Result<serde_json::Value, Box<dyn Error + Send + Sync>> {
@@ -151,12 +166,7 @@ impl<C: Client> HyperCoreClient<C> {
     }
 
     pub async fn get_spot_meta(&self) -> Result<SpotMeta, Box<dyn Error + Send + Sync>> {
-        let headers = HashMap::from([
-            (String::from(CONTENT_TYPE), ContentType::ApplicationJson.as_str().to_string()),
-            (String::from(X_CACHE_TTL), SPOT_META_CACHE_TTL_SECS.to_string()),
-        ]);
-        let response = self.client.post_with_headers("/info", &json!({ "type": "spotMeta" }), headers).await?;
-        Ok(serde_json::from_value(response)?)
+        self.info_with_cache(json!({ "type": "spotMeta" }), SPOT_META_CACHE_TTL_SECS).await
     }
 
     pub async fn get_spot_orderbook(&self, coin: &str) -> Result<OrderbookResponse, Box<dyn Error + Send + Sync>> {
@@ -186,10 +196,13 @@ impl<C: Client> HyperCoreClient<C> {
     }
 
     pub async fn get_user_abstraction(&self, user: &str) -> Result<UserAbstractionMode, Box<dyn Error + Send + Sync>> {
-        self.info(json!({
-            "type": "userAbstraction",
-            "user": user
-        }))
+        self.info_with_cache(
+            json!({
+                "type": "userAbstraction",
+                "user": user
+            }),
+            USER_ABSTRACTION_CACHE_TTL_SECS,
+        )
         .await
     }
 
@@ -278,5 +291,38 @@ impl<C: Client> ChainTraits for HyperCoreClient<C> {}
 impl<C: Client> chain_traits::ChainProvider for HyperCoreClient<C> {
     fn get_chain(&self) -> primitives::Chain {
         Chain::HyperCore
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use gem_client::testkit::MockClient;
+    use std::sync::Mutex;
+
+    #[tokio::test]
+    async fn test_get_user_abstraction_sets_cache_ttl_header() {
+        let seen_headers = Arc::new(Mutex::new(Vec::new()));
+        let seen_headers_clone = Arc::clone(&seen_headers);
+        let client = MockClient::new().with_post_with_headers(move |path, body, headers| {
+            assert_eq!(path, "/info");
+            let request: serde_json::Value = serde_json::from_slice(body).unwrap();
+            assert_eq!(
+                request,
+                json!({
+                    "type": "userAbstraction",
+                    "user": "0x123"
+                })
+            );
+            seen_headers_clone.lock().unwrap().push(headers.clone());
+            Ok(br#""default""#.to_vec())
+        });
+        let client = HyperCoreClient::new(client);
+
+        let mode = client.get_user_abstraction("0x123").await.unwrap();
+        let recorded_headers = seen_headers.lock().unwrap().clone();
+
+        assert_eq!(mode, UserAbstractionMode::Default);
+        assert_eq!(recorded_headers, vec![info_cache_headers(USER_ABSTRACTION_CACHE_TTL_SECS)]);
     }
 }

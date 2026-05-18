@@ -8,7 +8,7 @@ use std::{
 };
 
 type GetHandler = Arc<dyn Fn(&str) -> Result<Vec<u8>, ClientError> + Send + Sync>;
-type PostHandler = Arc<dyn Fn(&str, &[u8]) -> Result<Vec<u8>, ClientError> + Send + Sync>;
+type PostHandler = Arc<dyn Fn(&str, &[u8], &HashMap<String, String>) -> Result<Vec<u8>, ClientError> + Send + Sync>;
 
 #[derive(Clone, Default)]
 pub struct MockClient {
@@ -32,6 +32,14 @@ impl MockClient {
     pub fn with_post<F>(mut self, handler: F) -> Self
     where
         F: Fn(&str, &[u8]) -> Result<Vec<u8>, ClientError> + Send + Sync + 'static,
+    {
+        self.post_handler = Some(Arc::new(move |path, body, _headers| handler(path, body)));
+        self
+    }
+
+    pub fn with_post_with_headers<F>(mut self, handler: F) -> Self
+    where
+        F: Fn(&str, &[u8], &HashMap<String, String>) -> Result<Vec<u8>, ClientError> + Send + Sync + 'static,
     {
         self.post_handler = Some(Arc::new(handler));
         self
@@ -62,14 +70,14 @@ impl Client for MockClient {
         self.get_with(url, &[], HashMap::new()).await
     }
 
-    async fn post_with<T, R>(&self, path: &str, body: &T, _headers: HashMap<String, String>) -> Result<R, ClientError>
+    async fn post_with<T, R>(&self, path: &str, body: &T, headers: HashMap<String, String>) -> Result<R, ClientError>
     where
         T: Serialize + Send + Sync,
         R: DeserializeOwned,
     {
         let handler = self.post_handler.as_ref().ok_or(ClientError::Http { status: 404, body: vec![] })?;
         let body_bytes = serde_json::to_vec(body).map_err(|e| ClientError::Serialization(e.to_string()))?;
-        let data = handler(path, &body_bytes)?;
+        let data = handler(path, &body_bytes, &headers)?;
         deserialize_response(&Response { status: Some(200), data })
     }
 }
