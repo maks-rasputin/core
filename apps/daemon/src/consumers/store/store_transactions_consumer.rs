@@ -209,16 +209,20 @@ impl StoreTransactionsConsumer {
                     return None;
                 }
 
-                if transaction.state == TransactionState::Confirmed
-                    && CROSS_CHAIN_SOURCE_TYPES.contains(&transaction.transaction_type)
-                    && cross_chain::is_cross_chain_swap(&transaction, deposit_addresses)
-                {
+                if Self::should_mark_in_transit(&transaction, deposit_addresses) {
                     transaction.state = TransactionState::InTransit;
                 }
 
                 Some(transaction)
             })
             .collect()
+    }
+
+    fn should_mark_in_transit(transaction: &Transaction, deposit_addresses: &DepositAddressMap) -> bool {
+        transaction.state == TransactionState::Confirmed
+            && CROSS_CHAIN_SOURCE_TYPES.contains(&transaction.transaction_type)
+            && !(transaction.transaction_type == TransactionType::Swap && transaction.metadata.is_some())
+            && cross_chain::is_cross_chain_swap(transaction, deposit_addresses)
     }
 
     async fn publish_results(&self, result: ProcessingResult) -> Result<usize, Box<dyn Error + Send + Sync>> {
@@ -267,7 +271,7 @@ impl StoreTransactionsConsumer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use primitives::{Chain, Device, SwapProvider, WalletId};
+    use primitives::{AssetId, Chain, Device, SwapProvider, TransactionSwapMetadata, WalletId};
 
     #[test]
     fn test_transactions_for_storage() {
@@ -319,6 +323,26 @@ mod tests {
         assert_eq!(
             StoreTransactionsConsumer::transactions_for_storage(vec![cross_chain_swap_type], &deposit_addresses, &SendAddressMap::new())[0].state,
             TransactionState::InTransit
+        );
+
+        let confirmed_cross_chain_swap_update = Transaction {
+            transaction_type: TransactionType::Swap,
+            to: near_vault.clone(),
+            metadata: Some(
+                serde_json::to_value(TransactionSwapMetadata {
+                    from_asset: AssetId::from_chain(Chain::Solana),
+                    from_value: "5000000".to_string(),
+                    to_asset: AssetId::from_chain(Chain::Ton),
+                    to_value: "2508437099".to_string(),
+                    provider: Some(SwapProvider::NearIntents.as_ref().to_string()),
+                })
+                .unwrap(),
+            ),
+            ..Transaction::mock()
+        };
+        assert_eq!(
+            StoreTransactionsConsumer::transactions_for_storage(vec![confirmed_cross_chain_swap_update], &deposit_addresses, &SendAddressMap::new())[0].state,
+            TransactionState::Confirmed
         );
 
         let token_approval = Transaction {
