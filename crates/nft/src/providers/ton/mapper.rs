@@ -23,10 +23,10 @@ pub fn map_asset(response: NftItemsResponse, asset_id: NFTAssetId) -> Option<NFT
 }
 
 pub fn map_collection(response: NftCollectionsResponse, collection_id: NFTCollectionId) -> Option<NFTCollection> {
-    Address::try_parse_base64(&collection_id.contract_address)?;
+    let address = Address::try_parse_base64(&collection_id.contract_address)?;
     let collection = response.nft_collections.into_iter().next()?;
     let info = valid_named_token_info(response.metadata.get(&collection.address))?;
-    Some(build_collection(&collection_id, info))
+    Some(build_collection(&collection_id, &address, info))
 }
 
 pub fn map_nft_data(response: NftItemsResponse) -> Vec<NFTData> {
@@ -39,7 +39,7 @@ pub fn map_nft_data(response: NftItemsResponse) -> Vec<NFTData> {
             let address = Address::try_parse_hex(hex)?;
             let info = valid_named_token_info(metadata.get(hex))?;
             let collection_id = NFTCollectionId::new(Chain::Ton, &address.encode());
-            Some((collection_id.clone(), build_collection(&collection_id, info)))
+            Some((collection_id.clone(), build_collection(&collection_id, &address, info)))
         })
         .collect();
 
@@ -85,9 +85,9 @@ fn build_asset(asset_id: NFTAssetId, info: &TokenInfo, collection_image: Option<
     }
 }
 
-fn build_collection(collection_id: &NFTCollectionId, info: &TokenInfo) -> NFTCollection {
+fn build_collection(collection_id: &NFTCollectionId, address: &Address, info: &TokenInfo) -> NFTCollection {
     let image = info.image.clone().unwrap_or_default();
-    let is_verified = collection_is_verified(collection_id, info);
+    let is_verified = is_verified(address, info);
     NFTCollection {
         id: collection_id.clone(),
         name: token_info_name(info).unwrap_or_default().to_string(),
@@ -102,12 +102,6 @@ fn build_collection(collection_id: &NFTCollectionId, info: &TokenInfo) -> NFTCol
         links: vec![],
         is_verified,
     }
-}
-
-fn collection_is_verified(collection_id: &NFTCollectionId, info: &TokenInfo) -> bool {
-    Address::try_parse_base64(&collection_id.contract_address)
-        .as_ref()
-        .is_some_and(|address| is_verified(address, info))
 }
 
 fn valid_named_token_info(metadata: Option<&TokenMetadata>) -> Option<&TokenInfo> {

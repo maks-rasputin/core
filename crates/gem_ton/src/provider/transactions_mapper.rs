@@ -6,7 +6,7 @@ use crate::models::{
 };
 use chrono::DateTime;
 use gem_encoding::decode_base64;
-use primitives::{Address as _, AssetId, NFTAssetId, Transaction, TransactionNFTTransferMetadata, TransactionState, TransactionSwapMetadata, TransactionType, chain::Chain};
+use primitives::{AssetId, NFTAssetId, Transaction, TransactionNFTTransferMetadata, TransactionState, TransactionSwapMetadata, TransactionType, chain::Chain};
 use std::error::Error;
 
 pub fn map_transaction_broadcast(broadcast_result: BroadcastTransaction) -> Result<String, Box<dyn Error + Sync + Send>> {
@@ -127,8 +127,8 @@ fn jetton_transfer_details(actions: &[TraceAction]) -> Option<TransferDetails> {
 
 fn nft_transfer_details(actions: &[TraceAction]) -> Option<TransferDetails> {
     let details: NftTransferDetails = serde_json::from_value(find_action(actions, TRACE_ACTION_NFT_TRANSFER)?.details.clone()?).ok()?;
-    let collection = details.nft_collection.encode();
-    let item = details.nft_item.encode();
+    let collection = details.nft_collection.encode_bounceable();
+    let item = details.nft_item.encode_bounceable();
     let metadata = TransactionNFTTransferMetadata::from_asset_id(NFTAssetId::new(Chain::Ton, &collection, &item));
     let metadata_value = serde_json::to_value(metadata).ok()?;
 
