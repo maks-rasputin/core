@@ -11,10 +11,7 @@ pub fn map_asset_ids(response: &NftItemsResponse) -> Vec<NFTAssetId> {
 }
 
 pub fn map_asset(response: NftItemsResponse, asset_id: NFTAssetId) -> Option<NFTAsset> {
-    let collection = Address::try_parse_base64(&asset_id.contract_address)?;
-    if !is_verified(&collection) {
-        return None;
-    }
+    Address::try_parse_base64(&asset_id.contract_address)?;
     let item = response.nft_items.into_iter().next()?;
     let info = valid_named_token_info(response.metadata.get(&item.address))?;
     let collection_image = item
@@ -26,10 +23,7 @@ pub fn map_asset(response: NftItemsResponse, asset_id: NFTAssetId) -> Option<NFT
 }
 
 pub fn map_collection(response: NftCollectionsResponse, collection_id: NFTCollectionId) -> Option<NFTCollection> {
-    let address = Address::try_parse_base64(&collection_id.contract_address)?;
-    if !is_verified(&address) {
-        return None;
-    }
+    Address::try_parse_base64(&collection_id.contract_address)?;
     let collection = response.nft_collections.into_iter().next()?;
     let info = valid_named_token_info(response.metadata.get(&collection.address))?;
     Some(build_collection(&collection_id, info))
@@ -43,9 +37,6 @@ pub fn map_nft_data(response: NftItemsResponse) -> Vec<NFTData> {
         .filter_map(|item| {
             let hex = item.collection_address.as_deref()?;
             let address = Address::try_parse_hex(hex)?;
-            if !is_verified(&address) {
-                return None;
-            }
             let info = valid_named_token_info(metadata.get(hex))?;
             let collection_id = NFTCollectionId::new(Chain::Ton, &address.encode());
             Some((collection_id.clone(), build_collection(&collection_id, info)))
@@ -96,6 +87,7 @@ fn build_asset(asset_id: NFTAssetId, info: &TokenInfo, collection_image: Option<
 
 fn build_collection(collection_id: &NFTCollectionId, info: &TokenInfo) -> NFTCollection {
     let image = info.image.clone().unwrap_or_default();
+    let is_verified = collection_is_verified(collection_id, info);
     NFTCollection {
         id: collection_id.clone(),
         name: token_info_name(info).unwrap_or_default().to_string(),
@@ -106,10 +98,16 @@ fn build_collection(collection_id: &NFTCollectionId, info: &TokenInfo) -> NFTCol
         images: NFTImages {
             preview: NFTResource::from_url(&image),
         },
-        status: VerificationStatus::Verified,
+        status: VerificationStatus::from_verified(is_verified),
         links: vec![],
-        is_verified: true,
+        is_verified,
     }
+}
+
+fn collection_is_verified(collection_id: &NFTCollectionId, info: &TokenInfo) -> bool {
+    Address::try_parse_base64(&collection_id.contract_address)
+        .as_ref()
+        .is_some_and(|address| is_verified(address, info))
 }
 
 fn valid_named_token_info(metadata: Option<&TokenMetadata>) -> Option<&TokenInfo> {
@@ -126,9 +124,6 @@ fn token_info_name(info: &TokenInfo) -> Option<&str> {
 fn asset_id_from_item(item: &NftItem, metadata: &HashMap<String, TokenMetadata>) -> Option<NFTAssetId> {
     let collection_hex = item.collection_address.as_deref()?;
     let collection = Address::try_parse_hex(collection_hex)?;
-    if !is_verified(&collection) {
-        return None;
-    }
     valid_named_token_info(metadata.get(&item.address))?;
     let token = Address::try_parse_hex(&item.address)?;
     Some(NFTAssetId::new(Chain::Ton, &collection.encode(), &token.encode()))
@@ -142,6 +137,7 @@ mod tests {
     const ITEM: &str = "EQCvxJy4eG8hyHBFsZ7eePxrRsUQSEUTP46abUQGAcGY6mOw";
     const NUMBERS_COLLECTION: &str = "EQAOQdwdw8kGftJCSFgOErM1mBjYPe4DBPq8-AhF6vr9si5N";
     const UNVERIFIED_COLLECTION: &str = "EQBBhhF6O-jfi1TEF1rs6pEaynEjhFrcjUCC2DfUwzJ4pRXR";
+    const GETGEMS_COLLECTION: &str = "EQCwbUhN1REI4q-N8EV2ordMxXognDW2y0teRiBP0RjgCc6T";
 
     #[test]
     fn test_map_asset_ids() {
@@ -173,10 +169,14 @@ mod tests {
     }
 
     #[test]
-    fn test_map_asset_rejects_unverified_collection() {
-        let response: NftItemsResponse = serde_json::from_str(include_str!("../../../testdata/ton/items.json")).unwrap();
+    fn test_map_asset_unverified_collection() {
+        let response: NftItemsResponse = serde_json::from_str(include_str!("../../../testdata/ton/items_unverified.json")).unwrap();
         let asset_id = NFTAssetId::new(Chain::Ton, UNVERIFIED_COLLECTION, ITEM);
-        assert!(map_asset(response, asset_id).is_none());
+        let asset = map_asset(response, asset_id).unwrap();
+
+        assert_eq!(asset.id, NFTAssetId::new(Chain::Ton, UNVERIFIED_COLLECTION, ITEM));
+        assert_eq!(asset.collection_id, NFTCollectionId::new(Chain::Ton, UNVERIFIED_COLLECTION));
+        assert_eq!(asset.name, "Unverified Item");
     }
 
     #[test]
@@ -190,10 +190,37 @@ mod tests {
         assert_eq!(collection.contract_address, NUMBERS_COLLECTION);
         assert_eq!(collection.name, "Anonymous Telegram Numbers");
         assert!(collection.is_verified);
+        assert_eq!(collection.status, VerificationStatus::Verified);
     }
 
     #[test]
-    fn test_map_collection_rejects_unverified() {
+    fn test_map_collection_getgems_verified() {
+        let response: NftCollectionsResponse = serde_json::from_str(include_str!("../../../testdata/ton/collections_getgems.json")).unwrap();
+        let collection_id = NFTCollectionId::new(Chain::Ton, GETGEMS_COLLECTION);
+        let collection = map_collection(response, collection_id).unwrap();
+
+        assert_eq!(collection.status, VerificationStatus::Verified);
+        assert!(collection.is_verified);
+        assert_eq!(collection.links, vec![]);
+    }
+
+    #[test]
+    fn test_map_nft_data_includes_unverified_collection() {
+        let response: NftItemsResponse = serde_json::from_str(include_str!("../../../testdata/ton/items_unverified.json")).unwrap();
+        let asset_ids = map_asset_ids(&response);
+        let data = map_nft_data(response);
+
+        assert_eq!(asset_ids, vec![NFTAssetId::new(Chain::Ton, UNVERIFIED_COLLECTION, ITEM)]);
+        assert_eq!(data.len(), 1);
+        assert_eq!(data[0].collection.id, NFTCollectionId::new(Chain::Ton, UNVERIFIED_COLLECTION));
+        assert_eq!(data[0].collection.status, VerificationStatus::Unverified);
+        assert!(!data[0].collection.is_verified);
+        assert_eq!(data[0].assets.len(), 1);
+        assert_eq!(data[0].assets[0].id, NFTAssetId::new(Chain::Ton, UNVERIFIED_COLLECTION, ITEM));
+    }
+
+    #[test]
+    fn test_map_collection_rejects_invalid_metadata() {
         let response: NftCollectionsResponse = serde_json::from_str(include_str!("../../../testdata/ton/collections_invalid.json")).unwrap();
         let collection_id = NFTCollectionId::new(Chain::Ton, UNVERIFIED_COLLECTION);
         assert!(map_collection(response, collection_id).is_none());

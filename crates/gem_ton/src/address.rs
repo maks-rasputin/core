@@ -8,6 +8,8 @@ use primitives::{Address as AddressTrait, AddressError, SignerError};
 #[cfg(feature = "tvm")]
 use crate::tvm::{BagOfCells, BitReader, Cell, CellBuilder, TvmError};
 
+pub mod serializer;
+
 type Workchain = i32;
 type HashPart = [u8; 32];
 type RawBytes = [u8; 33];
@@ -25,6 +27,8 @@ fn crc16(slice: &[u8]) -> u16 {
 pub struct Address {
     bytes: RawBytes,
 }
+
+pub type TonAddress = Address;
 
 impl Address {
     pub fn new(workchain: Workchain, hash_part: HashPart) -> Self {

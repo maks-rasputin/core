@@ -5,6 +5,8 @@ use primitives::TransactionState;
 use serde::{Deserialize, Serialize};
 use serde_serializers::deserialize_biguint_from_str;
 
+use crate::address::{TonAddress, serializer::hex_or_base64};
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DecodedBody {
     #[serde(rename = "type")]
@@ -100,6 +102,7 @@ impl Trace {
 
 pub const TRACE_ACTION_JETTON_SWAP: &str = "jetton_swap";
 pub const TRACE_ACTION_JETTON_TRANSFER: &str = "jetton_transfer";
+pub const TRACE_ACTION_NFT_TRANSFER: &str = "nft_transfer";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TraceAction {
@@ -130,6 +133,19 @@ pub struct JettonTransferDetails {
     pub sender: String,
     pub receiver: String,
     pub amount: String,
+    pub comment: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct NftTransferDetails {
+    #[serde(deserialize_with = "hex_or_base64::deserialize")]
+    pub nft_collection: TonAddress,
+    #[serde(deserialize_with = "hex_or_base64::deserialize")]
+    pub nft_item: TonAddress,
+    #[serde(deserialize_with = "hex_or_base64::deserialize")]
+    pub old_owner: TonAddress,
+    #[serde(deserialize_with = "hex_or_base64::deserialize")]
+    pub new_owner: TonAddress,
     pub comment: Option<String>,
 }
 
