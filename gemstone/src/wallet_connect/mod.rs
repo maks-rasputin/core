@@ -4,7 +4,7 @@ use gem_wallet_connect::{
     WalletConnectResponseType as WcWalletConnectResponseType, WalletConnectTransaction as WcWalletConnectTransaction,
     WalletConnectTransactionType as WcWalletConnectTransactionType, WalletConnectVerifier, config_session_properties,
 };
-use primitives::{Chain, TransferDataOutputType, WCEthereumTransaction, WalletConnectCAIP2, WalletConnectRequest, WalletConnectionVerificationStatus};
+use primitives::{Chain, TransferDataOutputType, WCEthereumTransaction, WalletConnectCAIP2, WalletConnectLink, WalletConnectRequest, WalletConnectionVerificationStatus};
 use std::collections::HashMap;
 use std::str::FromStr;
 
@@ -24,6 +24,13 @@ pub enum WalletConnectionVerificationStatus {
     Unknown,
     Invalid,
     Malicious,
+}
+
+#[uniffi::remote(Enum)]
+pub enum WalletConnectLink {
+    Connect { uri: String },
+    Request,
+    Session { topic: String },
 }
 
 // UniFFI types

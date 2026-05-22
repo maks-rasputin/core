@@ -5,6 +5,7 @@ pub mod api_client;
 pub mod auth;
 pub mod block_explorer;
 pub mod config;
+pub mod deeplink;
 pub mod ethereum;
 pub mod gateway;
 pub mod gem_swapper;
@@ -19,6 +20,7 @@ pub mod siwe;
 #[cfg(all(test, feature = "reqwest_provider"))]
 pub(crate) mod testkit;
 pub mod transaction_state;
+pub mod url_action;
 pub mod wallet_connect;
 
 use alien::AlienError;
