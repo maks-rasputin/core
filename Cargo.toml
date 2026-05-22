@@ -51,7 +51,6 @@ members = [
     "crates/streamer",
     "crates/swapper",
     "crates/tracing",
-    "crates/claude",
     "crates/support",
     "crates/yielder",
 ]

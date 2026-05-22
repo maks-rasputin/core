@@ -185,7 +185,7 @@ diesel_enum!(
     IpUsageTypeSql,
     [DataCenter, Hosting, Isp, Mobile, Business, Education, Government, Unknown]
 );
-diesel_enum!(WebhookKind, PrimitiveWebhookKind, WebhookKindSql, [Transactions, Support, SupportBot, Fiat]);
+diesel_enum!(WebhookKind, PrimitiveWebhookKind, WebhookKindSql, [Transactions, Support, Fiat]);
 
 macro_rules! diesel_varchar {
     ($wrapper:ident, $inner:ty) => {

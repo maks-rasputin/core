@@ -77,7 +77,7 @@ pub async fn create_webhook(
             let payload: TransactionId = serde_json::from_value(webhook_data)?;
             webhooks_client.lock().await.process_broadcast_webhook(payload).await?;
         }
-        WebhookKind::Support | WebhookKind::SupportBot => {
+        WebhookKind::Support => {
             webhooks_client.lock().await.process_support_webhook(webhook_data).await?;
         }
         WebhookKind::Fiat => {

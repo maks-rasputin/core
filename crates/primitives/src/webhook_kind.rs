@@ -7,6 +7,5 @@ use strum::{AsRefStr, EnumString};
 pub enum WebhookKind {
     Transactions,
     Support,
-    SupportBot,
     Fiat,
 }

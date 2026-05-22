@@ -217,12 +217,6 @@ pub enum ConfigKey {
     PriceObservedFetchInterval,
     PriceObservedMaxAssets,
     PriceObservedMinObservers,
-
-    // Support Bot
-    SupportBotSystemPrompt,
-    SupportBotMaxTokens,
-    SupportBotModel,
-    SupportBotApiVersion,
 }
 
 impl ConfigKey {
@@ -403,10 +397,6 @@ impl ConfigKey {
             Self::PriceObservedFetchInterval => "30s",
             Self::PriceObservedMaxAssets => "100",
             Self::PriceObservedMinObservers => "2",
-            Self::SupportBotSystemPrompt => "",
-            Self::SupportBotMaxTokens => "1024",
-            Self::SupportBotModel => "claude-sonnet-4-6",
-            Self::SupportBotApiVersion => "2023-06-01",
         }
     }
 }

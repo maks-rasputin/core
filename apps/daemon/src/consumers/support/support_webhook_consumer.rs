@@ -6,16 +6,15 @@ use streamer::SupportWebhookPayload;
 use streamer::consumer::MessageConsumer;
 
 use primitives::Device;
-use support::{ChatwootWebhookPayload, EVENT_CONVERSATION_STATUS_CHANGED, EVENT_CONVERSATION_UPDATED, EVENT_MESSAGE_CREATED, SupportBotClient, SupportClient};
+use support::{ChatwootWebhookPayload, EVENT_CONVERSATION_STATUS_CHANGED, EVENT_CONVERSATION_UPDATED, EVENT_MESSAGE_CREATED, SupportClient};
 
 pub struct SupportWebhookConsumer {
     support_client: SupportClient,
-    bot_client: SupportBotClient,
 }
 
 impl SupportWebhookConsumer {
-    pub fn new(support_client: SupportClient, bot_client: SupportBotClient) -> Self {
-        Self { support_client, bot_client }
+    pub fn new(support_client: SupportClient) -> Self {
+        Self { support_client }
     }
 
     async fn process_notification(&self, device: &Device, webhook: &ChatwootWebhookPayload) -> Result<usize, Box<dyn Error + Send + Sync>> {
@@ -41,16 +40,6 @@ impl MessageConsumer<SupportWebhookPayload, bool> for SupportWebhookConsumer {
                 return Ok(true);
             }
         };
-
-        if webhook.event == EVENT_MESSAGE_CREATED && webhook.is_incoming_message() {
-            return match self.bot_client.process_incoming(&webhook).await {
-                Ok(result) => Ok(result),
-                Err(error) => {
-                    error_with_fields!("bot webhook processing failed", &*error, payload = payload.data.to_string());
-                    Err(error)
-                }
-            };
-        }
 
         let Some(device_id) = webhook.get_device_id() else {
             info_with_fields!("support webhook missing device_id", event = webhook.event);

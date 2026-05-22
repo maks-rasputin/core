@@ -1,6 +1,6 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
-CREATE TYPE webhook_kind AS ENUM ('transactions', 'support', 'support_bot', 'fiat');
+CREATE TYPE webhook_kind AS ENUM ('transactions', 'support', 'fiat');
 
 CREATE TABLE webhook_endpoints (
     kind webhook_kind NOT NULL,

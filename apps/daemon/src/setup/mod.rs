@@ -112,13 +112,9 @@ fn setup_database(database: &Database) -> Result<(), Box<dyn std::error::Error +
 }
 
 fn webhook_endpoints() -> Vec<NewWebhookEndpointRow> {
-    let endpoints = [
-        (WebhookKind::Transactions, "dynode"),
-        (WebhookKind::Support, "chatwoot"),
-        (WebhookKind::SupportBot, "chatwoot"),
-    ]
-    .into_iter()
-    .map(|(kind, sender)| NewWebhookEndpointRow::new(kind, sender));
+    let endpoints = [(WebhookKind::Transactions, "dynode"), (WebhookKind::Support, "chatwoot")]
+        .into_iter()
+        .map(|(kind, sender)| NewWebhookEndpointRow::new(kind, sender));
 
     let fiat = FiatProviderName::all()
         .into_iter()
