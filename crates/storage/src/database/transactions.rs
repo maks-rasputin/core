@@ -5,8 +5,9 @@ use crate::{
     sql_types::{AssetId, TransactionState, TransactionType},
 };
 use chrono::NaiveDateTime;
-use diesel::dsl::count;
+use diesel::dsl::{count, sql};
 use diesel::prelude::*;
+use diesel::sql_types::{Jsonb, Nullable};
 use diesel::upsert::excluded;
 use primitives::Transaction;
 
@@ -85,7 +86,7 @@ impl TransactionsStore for DatabaseClient {
                             dsl::fee.eq(excluded(dsl::fee)),
                             dsl::fee_asset_id.eq(excluded(dsl::fee_asset_id)),
                             dsl::memo.eq(excluded(dsl::memo)),
-                            dsl::metadata.eq(excluded(dsl::metadata)),
+                            dsl::metadata.eq(sql::<Nullable<Jsonb>>("COALESCE(EXCLUDED.metadata, transactions.metadata)")),
                             dsl::utxo_inputs.eq(excluded(dsl::utxo_inputs)),
                             dsl::utxo_outputs.eq(excluded(dsl::utxo_outputs)),
                         ))
