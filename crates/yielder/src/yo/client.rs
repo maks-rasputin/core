@@ -86,12 +86,7 @@ impl YoGatewayClient {
         let allowance = self.ethereum_client.call_contract(token, IERC20::allowanceCall { owner, spender }).await?;
 
         if allowance < amount {
-            Ok(Some(ApprovalData {
-                token: token.to_string(),
-                spender: spender.to_string(),
-                value: amount.to_string(),
-                is_unlimited: false,
-            }))
+            Ok(Some(build_token_approval_data(token, spender, amount)))
         } else {
             Ok(None)
         }
@@ -111,6 +106,15 @@ fn convert_to_assets_ceil(shares: U256, total_assets: U256, total_supply: U256) 
     (shares * total_assets + total_supply - U256::from(1)) / total_supply
 }
 
+fn build_token_approval_data(token: Address, spender: Address, amount: U256) -> ApprovalData {
+    ApprovalData {
+        token: token.to_string(),
+        spender: spender.to_string(),
+        value: amount.to_string(),
+        is_unlimited: true,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -125,5 +129,22 @@ mod tests {
         assert_eq!(convert_to_assets_ceil(U256::ZERO, U256::from(1000), U256::from(500)), U256::ZERO);
         assert_eq!(convert_to_assets_ceil(U256::from(100), U256::from(1000), U256::ZERO), U256::ZERO);
         assert_eq!(convert_to_assets_ceil(U256::ZERO, U256::ZERO, U256::ZERO), U256::ZERO);
+    }
+
+    #[test]
+    fn test_build_token_approval_data() {
+        let token = Address::from([1; 20]);
+        let spender = Address::from([2; 20]);
+        let amount = U256::from(1234);
+
+        assert_eq!(
+            build_token_approval_data(token, spender, amount),
+            ApprovalData {
+                token: token.to_string(),
+                spender: spender.to_string(),
+                value: "1234".to_string(),
+                is_unlimited: true,
+            }
+        );
     }
 }

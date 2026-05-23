@@ -14,7 +14,7 @@ pub fn encode_erc20_transfer(to: &str, amount: &BigInt) -> Result<Vec<u8>, Box<d
     .abi_encode())
 }
 
-pub fn encode_erc20_approve(spender: &str) -> Result<Vec<u8>, Box<dyn Error + Send + Sync>> {
+pub fn encode_erc20_approve_max_value(spender: &str) -> Result<Vec<u8>, Box<dyn Error + Send + Sync>> {
     Ok(IERC20::approveCall {
         spender: Address::from_str(spender)?,
         value: U256::MAX,
@@ -40,4 +40,19 @@ pub fn encode_erc1155_transfer(from: &str, to: &str, token_id: &str) -> Result<V
         data: vec![].into(),
     }
     .abi_encode())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_encode_erc20_approve_max_value() {
+        let spender = "0x2b5AD5c4795c026514f8317c7a215E218dccD6cF";
+        let data = encode_erc20_approve_max_value(spender).unwrap();
+        let call = IERC20::approveCall::abi_decode(&data).unwrap();
+
+        assert_eq!(call.spender, Address::from_str(spender).unwrap());
+        assert_eq!(call.value, U256::MAX);
+    }
 }

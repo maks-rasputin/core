@@ -12,7 +12,7 @@ use primitives::{
     fee::GasPriceType,
 };
 
-use crate::encode::{encode_erc20_approve, encode_erc20_transfer, encode_erc721_transfer, encode_erc1155_transfer};
+use crate::encode::{encode_erc20_approve_max_value, encode_erc20_transfer, encode_erc721_transfer, encode_erc1155_transfer};
 use crate::everstake::{DEFAULT_ALLOWED_INTERCHANGE_NUM, EVERSTAKE_ACCOUNTING_ADDRESS, EVERSTAKE_POOL_ADDRESS, EVERSTAKE_SOURCE, IAccounting, IPool};
 use crate::fee_calculator::FeeCalculator;
 use crate::models::fee::EthereumFeeHistory;
@@ -92,7 +92,11 @@ pub fn get_transaction_params(chain: EVMChain, input: &TransactionLoadInput) -> 
         }
         TransactionInputType::Swap(from_asset, _, swap_data) => {
             if let Some(approval) = &swap_data.data.approval {
-                Ok(TransactionParams::new(approval.token.clone(), encode_erc20_approve(&approval.spender)?, BigInt::from(0)))
+                Ok(TransactionParams::new(
+                    approval.token.clone(),
+                    encode_erc20_approve_max_value(&approval.spender)?,
+                    BigInt::from(0),
+                ))
             } else {
                 match from_asset.id.token_subtype() {
                     AssetSubtype::NATIVE => Ok(TransactionParams::new(
@@ -111,7 +115,11 @@ pub fn get_transaction_params(chain: EVMChain, input: &TransactionLoadInput) -> 
                 }
             }
         }
-        TransactionInputType::TokenApprove(_, approval) => Ok(TransactionParams::new(approval.token.clone(), encode_erc20_approve(&approval.spender)?, BigInt::from(0))),
+        TransactionInputType::TokenApprove(_, approval) => Ok(TransactionParams::new(
+            approval.token.clone(),
+            encode_erc20_approve_max_value(&approval.spender)?,
+            BigInt::from(0),
+        )),
         TransactionInputType::Generic(_, _, extra) => Ok(TransactionParams::new(
             extra.to.clone(),
             extra.data.clone().unwrap_or_default(),
@@ -150,7 +158,7 @@ pub fn get_transaction_params(chain: EVMChain, input: &TransactionLoadInput) -> 
         },
         TransactionInputType::Earn(_, _, earn_data) => {
             if let Some(approval) = &earn_data.approval {
-                Ok(TransactionParams::new_approval(approval.token.clone(), encode_erc20_approve(&approval.spender)?))
+                Ok(TransactionParams::new_approval(approval.token.clone(), encode_erc20_approve_max_value(&approval.spender)?))
             } else {
                 Ok(TransactionParams::new(
                     earn_data.contract_address.clone(),

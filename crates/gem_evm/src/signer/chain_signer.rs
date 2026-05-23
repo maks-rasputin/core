@@ -8,7 +8,7 @@ use primitives::{ChainSigner, EVMChain, NFTType, SignerError, SignerInput, Stake
 
 use super::model::TransactionParams;
 use super::sign_eip1559_tx;
-use crate::encode::{encode_erc20_approve, encode_erc20_transfer, encode_erc721_transfer, encode_erc1155_transfer};
+use crate::encode::{encode_erc20_approve_max_value, encode_erc20_transfer, encode_erc721_transfer, encode_erc1155_transfer};
 
 #[allow(dead_code)]
 pub struct EvmChainSigner {
@@ -53,7 +53,7 @@ impl ChainSigner for EvmChainSigner {
         let params = TransactionParams::from_input(input)?;
         let approval = input.input_type.get_approval_data()?;
         sign_and_encode(
-            &build_eip1559_transaction(&params, &approval.token, U256::ZERO, Bytes::from(encode_erc20_approve(&approval.spender)?))?,
+            &build_eip1559_transaction(&params, &approval.token, U256::ZERO, Bytes::from(encode_erc20_approve_max_value(&approval.spender)?))?,
             private_key,
         )
     }
@@ -187,7 +187,7 @@ fn sign_contract_call(
     let params = TransactionParams::from_input(input)?;
 
     if let Some(approval) = approval {
-        let approval_transaction = build_eip1559_transaction(&params, &approval.token, U256::ZERO, Bytes::from(encode_erc20_approve(&approval.spender)?))?;
+        let approval_transaction = build_eip1559_transaction(&params, &approval.token, U256::ZERO, Bytes::from(encode_erc20_approve_max_value(&approval.spender)?))?;
         let main_params = TransactionParams {
             nonce: params.nonce + 1,
             gas_limit,
