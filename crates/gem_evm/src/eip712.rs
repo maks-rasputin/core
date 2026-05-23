@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use serde_serializers::deserialize_option_u64_from_str_or_int;
-use signer::hash_eip712;
+use signer::{hash_eip712, validate_eip712_domain_chain_id_binding};
 use std::collections::HashMap;
 
 use crate::address::ethereum_address_checksum;
@@ -82,6 +82,7 @@ pub fn eip712_hash_message(value: Value) -> Result<Vec<u8>, String> {
 
 pub fn validate_eip712_chain_id(data: &str, expected_chain_id: u64) -> Result<(), String> {
     let value: serde_json::Value = serde_json::from_str(data).map_err(|e| format!("Invalid EIP712 JSON: {}", e))?;
+    validate_eip712_domain_chain_id_binding(&value).map_err(|e| e.to_string())?;
     let message = parse_eip712_json(&value)?;
 
     if let Some(chain_id) = message.domain.chain_id
@@ -108,10 +109,10 @@ pub fn parse_eip712_json(value: &Value) -> Result<EIP712Message, String> {
         .ok_or_else(|| "Invalid EIP712 JSON: missing or invalid types".to_string())?;
     let all_types: HashMap<String, Vec<EIP712Type>> = types_value
         .iter()
-        .map(|(k, v)| {
-            serde_json::from_value(v.clone())
-                .map(|fields| (k.clone(), fields))
-                .map_err(|e| format!("Invalid EIP712 JSON: types field '{k}' parse error: {e}"))
+        .map(|(name, fields_json)| {
+            serde_json::from_value(fields_json.clone())
+                .map(|fields| (name.clone(), fields))
+                .map_err(|e| format!("Invalid EIP712 JSON: types field '{name}' parse error: {e}"))
         })
         .collect::<Result<_, _>>()?;
 
@@ -227,6 +228,7 @@ pub fn parse_value(type_name: &str, json_value: &Value, all_types: &HashMap<Stri
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::testkit::eip712_mock::mock_eip712_json;
     use primitives::{asset_constants::ETHEREUM_USDT_TOKEN_ID, contract_constants::ETHEREUM_UNISWAP_V3_UNIVERSAL_ROUTER_CONTRACT};
 
     #[test]
@@ -306,14 +308,12 @@ mod tests {
 
     #[test]
     fn test_validate_eip712_chain_id_match() {
-        use crate::testkit::eip712_mock::mock_eip712_json;
         let result = validate_eip712_chain_id(&mock_eip712_json(1), 1);
         assert!(result.is_ok());
     }
 
     #[test]
     fn test_validate_eip712_chain_id_mismatch() {
-        use crate::testkit::eip712_mock::mock_eip712_json;
         let result = validate_eip712_chain_id(&mock_eip712_json(137), 1);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Chain ID mismatch"));
@@ -321,9 +321,26 @@ mod tests {
 
     #[test]
     fn test_validate_eip712_polygon() {
-        use crate::testkit::eip712_mock::mock_eip712_json;
         let result = validate_eip712_chain_id(&mock_eip712_json(137), 137);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_eip712_chain_id_rejects_unbound_chain_id() {
+        let missing_schema_field = include_str!("../testdata/eip712_domain_chain_id_without_schema_field.json");
+        assert!(validate_eip712_chain_id(missing_schema_field, 1).unwrap_err().contains("chainId"));
+
+        let schema_without_domain_value = include_str!("../testdata/eip712_schema_chain_id_without_domain_value.json");
+        assert!(validate_eip712_chain_id(schema_without_domain_value, 1).unwrap_err().contains("missing chainId"));
+
+        let null_domain_chain_id = include_str!("../testdata/eip712_domain_chain_id_null_value.json");
+        assert!(validate_eip712_chain_id(null_domain_chain_id, 1).unwrap_err().contains("chainId"));
+    }
+
+    #[test]
+    fn test_validate_eip712_chain_id_accepts_declared_non_uint_chain_id_type() {
+        let json = include_str!("../testdata/eip712_domain_chain_id_schema_string.json");
+        assert!(validate_eip712_chain_id(json, 1).is_ok());
     }
 
     #[test]
@@ -342,26 +359,7 @@ mod tests {
 
     #[test]
     fn test_int8_type_parsing() {
-        let json_str = r#"{
-            "domain": {
-                "name": "Test",
-                "chainId": 1
-            },
-            "primaryType": "AccountRegistration",
-            "types": {
-                "AccountRegistration": [
-                    {
-                        "name": "accountIndex",
-                        "type": "int8"
-                    }
-                ]
-            },
-            "message": {
-                "accountIndex": 1
-            }
-        }"#;
-
-        let value: serde_json::Value = serde_json::from_str(json_str).unwrap();
+        let value: serde_json::Value = serde_json::from_str(include_str!("../testdata/eip712_int8_account_registration.json")).unwrap();
         let result = parse_eip712_json(&value);
 
         assert!(result.is_ok(), "Parsing failed: {:?}", result.err());

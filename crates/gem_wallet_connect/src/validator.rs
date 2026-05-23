@@ -115,6 +115,20 @@ mod tests {
     }
 
     #[test]
+    fn test_validate_eip712_without_domain_chain_id() {
+        let data = include_str!("../../gem_evm/testdata/ens_upload_avatar.json");
+        assert!(validate_sign_message(&sign_validation(Chain::Ethereum, &SignDigestType::Eip712, data, "")).is_ok());
+    }
+
+    #[test]
+    fn test_validate_eip712_domain_chain_id_without_schema_rejects() {
+        let data = include_str!("../../gem_evm/testdata/eip712_domain_chain_id_without_schema_field.json");
+        let result = validate_sign_message(&sign_validation(Chain::Ethereum, &SignDigestType::Eip712, data, ""));
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("chainId"));
+    }
+
+    #[test]
     fn test_validate_eip191_always_ok() {
         assert!(validate_sign_message(&sign_validation(Chain::Ethereum, &SignDigestType::Eip191, "anything", "example.com")).is_ok());
     }

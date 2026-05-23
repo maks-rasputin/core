@@ -21,7 +21,7 @@ pub struct TypedData {
 }
 
 impl TypedData {
-    pub fn from_json(json: &str) -> Result<Self, SignerError> {
-        serde_json::from_str(json).map_err(|err| SignerError::invalid_input(format!("Invalid EIP-712 JSON: {err}")))
+    pub fn from_value(value: Value) -> Result<Self, SignerError> {
+        serde_json::from_value(value).map_err(|err| SignerError::invalid_input(format!("Invalid EIP-712 JSON: {err}")))
     }
 }

@@ -2,7 +2,7 @@ mod data;
 mod hash_impl;
 mod parse;
 
-pub use hash_impl::hash_typed_data;
+pub use hash_impl::{hash_typed_data, validate_eip712_domain_chain_id_binding};
 
 #[cfg(test)]
 mod tests {
@@ -50,5 +50,24 @@ mod tests {
         let digest = hash_typed_data(json).expect("hash succeeds");
         let expected = <[u8; 32]>::from_hex("10e6c8b7c51b08488a421a5492d4524439470010eb2f8c80c22b9d918d79a5a9").unwrap();
         assert_eq!(digest, expected);
+    }
+
+    #[test]
+    fn hash_differs_across_chain_ids() {
+        let ethereum_json = include_str!("../../testdata/eip712_canonical_chain_id_1.json");
+        let polygon_json = include_str!("../../testdata/eip712_canonical_chain_id_137.json");
+        assert_ne!(hash_typed_data(ethereum_json).unwrap(), hash_typed_data(polygon_json).unwrap());
+    }
+
+    #[test]
+    fn hash_rejects_unbound_chain_id() {
+        let missing_schema_field = include_str!("../../../gem_evm/testdata/eip712_domain_chain_id_without_schema_field.json");
+        assert!(hash_typed_data(missing_schema_field).unwrap_err().to_string().contains("chainId"));
+
+        let schema_without_domain_value = include_str!("../../../gem_evm/testdata/eip712_schema_chain_id_without_domain_value.json");
+        assert!(hash_typed_data(schema_without_domain_value).unwrap_err().to_string().contains("missing chainId"));
+
+        let null_domain_chain_id = include_str!("../../../gem_evm/testdata/eip712_domain_chain_id_null_value.json");
+        assert!(hash_typed_data(null_domain_chain_id).unwrap_err().to_string().contains("chainId"));
     }
 }

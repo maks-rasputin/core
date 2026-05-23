@@ -147,6 +147,14 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_sign_typed_data_eip712_domain_chain_id_without_schema_rejects() {
+        let params = serde_json::json!(["0x123", include_str!("../../../gem_evm/testdata/eip712_domain_chain_id_without_schema_field.json")]);
+        let result = EthereumRequestHandler::parse_sign_typed_data(Chain::Ethereum, params);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("chainId"));
+    }
+
+    #[test]
     fn test_parse_send_transaction() {
         let params = serde_json::from_str(r#"[{"to":"0x123","value":"0x0"}]"#).unwrap();
         assert_eq!(

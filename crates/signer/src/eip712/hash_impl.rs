@@ -14,7 +14,9 @@ use super::parse::{
 const PREFIX_PERSONAL_MESSAGE: &[u8] = b"\x19\x01";
 
 pub fn hash_typed_data(json: &str) -> Result<[u8; 32], SignerError> {
-    let parsed = TypedData::from_json(json)?;
+    let value: Value = serde_json::from_str(json).map_err(|err| SignerError::invalid_input(format!("Invalid EIP-712 JSON: {err}")))?;
+    validate_eip712_domain_chain_id_binding(&value)?;
+    let parsed = TypedData::from_value(value)?;
 
     if parsed.message.is_null() {
         return SignerError::invalid_input_err("Invalid EIP-712 JSON: missing message");
@@ -34,6 +36,21 @@ pub fn hash_typed_data(json: &str) -> Result<[u8; 32], SignerError> {
     preimage.extend_from_slice(&message_hash);
 
     Ok(keccak256(&preimage))
+}
+
+pub fn validate_eip712_domain_chain_id_binding(value: &Value) -> Result<(), SignerError> {
+    let domain_chain_id = value.get("domain").and_then(|domain| domain.get("chainId"));
+    let schema_has_chain_id = value
+        .get("types")
+        .and_then(|types| types.get("EIP712Domain"))
+        .and_then(Value::as_array)
+        .is_some_and(|fields| fields.iter().any(|field| field.get("name").and_then(Value::as_str) == Some("chainId")));
+
+    match (domain_chain_id, schema_has_chain_id) {
+        (Some(_), false) => SignerError::invalid_input_err("EIP712Domain type schema must declare chainId when domain.chainId is present"),
+        (Some(Value::Null) | None, true) => SignerError::invalid_input_err("EIP712 domain missing chainId"),
+        _ => Ok(()),
+    }
 }
 
 fn hash_struct(primary_type: &str, data: Option<&Value>, types: &std::collections::HashMap<String, Vec<TypeField>>) -> Result<[u8; 32], SignerError> {

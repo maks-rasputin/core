@@ -21,7 +21,7 @@ pub use crate::secp256k1::{
 };
 
 pub use decode::{decode_private_key, encode_private_key, supports_private_key_import};
-pub use eip712::hash_typed_data as hash_eip712;
+pub use eip712::{hash_typed_data as hash_eip712, validate_eip712_domain_chain_id_binding};
 pub use primitives::SignerError;
 
 #[derive(Debug, Default)]
