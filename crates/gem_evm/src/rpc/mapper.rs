@@ -410,44 +410,16 @@ mod tests {
 
     #[test]
     fn test_map_smartchain_staking_transaction() {
-        let transaction = Transaction {
-            hash: "0x21442c7c30a6c1d6be3b5681275adb1f1402cef066579c4f53ec4f1c8c056ab0".to_string(),
-            from: "0xf1a3687303606a6fd48179ce503164cdcbabeab6".to_string(),
-            to: Some("0x0000000000000000000000000000000000002002".to_string()),
-            value: BigUint::parse_bytes(b"1158e460913d00000", 16).unwrap(),
-            gas: 280395,
-            input: "0x982ef0a7000000000000000000000000d34403249b2d82aaddb14e778422c966265e5fb50000000000000000000000000000000000000000000000000000000000000000".to_string(),
-            block_number: BigUint::from(0x1234u32),
-        };
+        let transaction = load_json_rpc_result::<Transaction>(include_str!("../../testdata/smartchain/transaction_staking_delegate.json"));
+        let receipt = load_json_rpc_result::<TransactionReciept>(include_str!("../../testdata/smartchain/transaction_staking_delegate_receipt.json"));
+        let tx = EthereumMapper::map_transaction(Chain::SmartChain, &transaction, &receipt, None, &BigUint::from(1735671600u64), None).unwrap();
 
-        let receipt = TransactionReciept {
-            gas_used: BigUint::from(100000u32),
-            effective_gas_price: BigUint::from(20000000000u64),
-            l1_fee: None,
-            logs: vec![Log {
-                address: "0x0000000000000000000000000000000000002002".to_string(),
-                topics: vec![
-                    "0x24d7bda8602b916d64417f0dbfe2e2e88ec9b1157bd9f596dfdb91ba26624e04".to_string(), // Delegated event
-                    "0x000000000000000000000000d34403249B2d82AAdDB14e778422c966265e5Fb5".to_string(), // operatorAddress
-                    "0x000000000000000000000000f1a3687303606a6fD48179Ce503164CDcBAbeaB6".to_string(), // delegator
-                ],
-                data: "0x00000000000000000000000000000000000000000000000d5cc0065cf2d900aa0000000000000000000000000000000000000000000000001158e460913d00000".to_string(),
-                transaction_hash: None,
-            }],
-            status: "0x1".to_string(),
-            block_hash: "0x1111111111111111111111111111111111111111111111111111111111111111".to_string(),
-            block_number: BigUint::from(0x1234u32),
-        };
-
-        let result = EthereumMapper::map_transaction(Chain::SmartChain, &transaction, &receipt, None, &BigUint::from(1735671600u64), None);
-
-        assert!(result.is_some());
-        let tx = result.unwrap();
         assert_eq!(tx.transaction_type, TransactionType::StakeDelegate);
-        assert_eq!(tx.from, "0xf1a3687303606a6fD48179Ce503164CDcBAbeaB6");
+        assert_eq!(tx.from, "0x51eD60604637989d19D29e43c5D94B098A0d1Af7");
         assert_eq!(tx.to, "0xd34403249B2d82AAdDB14e778422c966265e5Fb5");
-        assert_eq!(tx.contract.unwrap(), "0x0000000000000000000000000000000000002002");
-        assert!(tx.metadata.is_none());
+        assert_eq!(tx.contract.as_deref(), Some("0x0000000000000000000000000000000000002002"));
+        assert_eq!(tx.value, "1000000000000000000");
+        assert_eq!(tx.metadata, None);
     }
 
     #[test]
