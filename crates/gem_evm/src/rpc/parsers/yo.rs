@@ -1,10 +1,10 @@
 use crate::{
     address::{ethereum_address_checksum, ethereum_address_from_topic},
-    rpc::{mapper::TRANSFER_TOPIC, staking_mapper::ethereum_value_from_log_data},
+    rpc::mapper::TRANSFER_TOPIC,
 };
 use primitives::{AssetId, Transaction as PrimitivesTransaction, TransactionType, contract_constants::ETHEREUM_YO_PROTOCOL_CONTRACT};
 
-use super::{ParseContext, ProtocolParser};
+use super::{ParseContext, ProtocolParser, ethereum_value_from_log_data};
 
 pub(crate) const FUNCTION_YO_DEPOSIT: &str = "0x82b78ba7";
 pub(crate) const FUNCTION_YO_WITHDRAW: &str = "0x99519ab8";

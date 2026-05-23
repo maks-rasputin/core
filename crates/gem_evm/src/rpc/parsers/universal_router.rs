@@ -4,7 +4,7 @@ use alloy_sol_types::SolCall;
 use crate::{
     address::ethereum_address_from_topic,
     ethereum_address_checksum,
-    rpc::{mapper::TRANSFER_TOPIC, model::TransactionReciept, staking_mapper::ethereum_value_from_log_data},
+    rpc::{mapper::TRANSFER_TOPIC, model::TransactionReciept},
     uniswap::{
         actions::{V4Action, decode_action_data},
         command::{SWEEP_COMMAND, Sweep, UNWRAP_WETH_COMMAND, UnwrapWeth, V3_SWAP_EXACT_IN_COMMAND, V3SwapExactIn, V4_SWAP_COMMAND, WRAP_ETH_COMMAND},
@@ -15,7 +15,7 @@ use crate::{
 };
 use primitives::{AssetId, Chain, Transaction as PrimitivesTransaction, TransactionSwapMetadata, decode_hex};
 
-use super::{ParseContext, ProtocolParser, make_swap_transaction, try_map_balance_diff_swap};
+use super::{ParseContext, ProtocolParser, ethereum_value_from_log_data, make_swap_transaction, try_map_balance_diff_swap};
 
 const WITHDRAWAL_TOPIC: &str = "0x7fcf532c15f0a6db0bd6d0e038bea71d30d808c7d98cb3bf7268a95bf5081b65";
 

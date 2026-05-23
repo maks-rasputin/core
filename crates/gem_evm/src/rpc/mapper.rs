@@ -3,7 +3,7 @@ use num_bigint::BigUint;
 use num_traits::Num;
 use std::sync::LazyLock;
 
-use super::{parsers::ProtocolParsers, staking_mapper::StakingMapper};
+use super::parsers::ProtocolParsers;
 use crate::{
     address::{ethereum_address_checksum, ethereum_address_from_topic},
     registry::ContractRegistry,
@@ -204,11 +204,6 @@ impl EthereumMapper {
                     created_at,
                 ));
             }
-        }
-
-        // Try to decode BSC staking transaction
-        if let Some(tx) = StakingMapper::map_transaction(&chain, transaction, transaction_reciept, trace, created_at) {
-            return Some(tx);
         }
 
         let (transaction_type, memo, data) = if is_native_transfer {

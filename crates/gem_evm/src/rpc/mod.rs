@@ -4,8 +4,6 @@ pub mod client;
 pub mod mapper;
 pub mod model;
 mod parsers;
-pub mod staking_mapper;
 
 pub use client::EthereumClient;
 pub use mapper::EthereumMapper;
-pub use staking_mapper::StakingMapper;

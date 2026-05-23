@@ -1,10 +1,13 @@
 pub mod dex;
 pub mod okx;
 pub mod pancakeswap;
+pub mod staking;
 pub mod universal_router;
 pub mod yo;
 
 use chrono::{DateTime, Utc};
+use num_bigint::BigUint;
+use num_traits::Num;
 
 use super::{
     balance_differ::BalanceDiffer,
@@ -14,7 +17,14 @@ use crate::{ethereum_address_checksum, registry::ContractRegistry};
 use chain_primitives::SwapMapper as BalanceSwapMapper;
 use primitives::{AssetId, Chain, Transaction as PrimitivesTransaction, TransactionSwapMetadata, TransactionType};
 
-use self::{dex::DexSwapParser, okx::OkxParser, pancakeswap::PancakeSwapParser, universal_router::UniversalRouterParser, yo::YoParser};
+use self::{
+    dex::DexSwapParser,
+    okx::OkxParser,
+    pancakeswap::PancakeSwapParser,
+    staking::{EverstakeParser, MonadStakingParser, SmartChainStakingParser},
+    universal_router::UniversalRouterParser,
+    yo::YoParser,
+};
 
 pub struct ParseContext<'a> {
     pub chain: &'a Chain,
@@ -30,11 +40,24 @@ pub trait ProtocolParser {
     fn parse(&self, context: &ParseContext<'_>) -> Option<PrimitivesTransaction>;
 }
 
+fn ethereum_value_from_log_data(data: &str, start: usize, end: usize) -> Option<BigUint> {
+    data.trim_start_matches("0x").get(start..end).and_then(|s| BigUint::from_str_radix(s, 16).ok())
+}
+
 pub struct ProtocolParsers;
 
 impl ProtocolParsers {
-    fn parsers() -> [&'static dyn ProtocolParser; 5] {
-        [&OkxParser, &YoParser, &PancakeSwapParser, &UniversalRouterParser, &DexSwapParser]
+    fn parsers() -> [&'static dyn ProtocolParser; 8] {
+        [
+            &EverstakeParser,
+            &MonadStakingParser,
+            &SmartChainStakingParser,
+            &OkxParser,
+            &YoParser,
+            &PancakeSwapParser,
+            &UniversalRouterParser,
+            &DexSwapParser,
+        ]
     }
 
     pub fn map_transaction(

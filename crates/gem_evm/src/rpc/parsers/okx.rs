@@ -4,11 +4,11 @@ use num_bigint::BigUint;
 use crate::{
     address::ethereum_address_from_topic,
     ethereum_address_checksum,
-    rpc::{mapper::TRANSFER_TOPIC, model::Log, staking_mapper::ethereum_value_from_log_data},
+    rpc::{mapper::TRANSFER_TOPIC, model::Log},
 };
 use primitives::{AssetId, SwapProvider, Transaction as PrimitivesTransaction, TransactionSwapMetadata};
 
-use super::{ParseContext, ProtocolParser, make_swap_transaction, try_map_balance_diff_swap};
+use super::{ParseContext, ProtocolParser, ethereum_value_from_log_data, make_swap_transaction, try_map_balance_diff_swap};
 
 pub(crate) const FUNCTION_OKX_DAG_SWAP_BY_ORDER_ID: &str = "0xf2c42696";
 pub(crate) const FUNCTION_OKX_UNISWAP_V3_SWAP_TO: &str = "0x0d5f0e3b";
