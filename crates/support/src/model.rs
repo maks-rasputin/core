@@ -38,6 +38,7 @@ pub struct Account {
 pub struct ChatwootWebhookPayload {
     pub event: String,
     pub message_type: Option<String>,
+    pub private: Option<bool>,
     pub unread_count: Option<i32>,
     pub conversation: Option<Conversation>,
     pub account: Option<Account>,
@@ -61,6 +62,7 @@ pub struct Message {
     pub id: i64,
     pub content: Option<String>,
     pub message_type: MessageType,
+    pub private: Option<bool>,
     pub sender: Option<Sender>,
 }
 
@@ -101,6 +103,10 @@ impl ChatwootWebhookPayload {
 
     pub fn is_incoming_message(&self) -> bool {
         self.message_type.as_deref() == Some("incoming")
+    }
+
+    pub fn is_public_outgoing_message(&self) -> bool {
+        self.is_outgoing_message() && self.private == Some(false)
     }
 
     pub fn get_account_id(&self) -> Option<i64> {

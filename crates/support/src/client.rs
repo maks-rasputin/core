@@ -36,7 +36,7 @@ impl SupportClient {
     }
 
     fn build_notification(device: &Device, payload: &ChatwootWebhookPayload) -> Option<GorushNotification> {
-        if !payload.is_outgoing_message() {
+        if !payload.is_public_outgoing_message() {
             return None;
         }
 
@@ -68,6 +68,25 @@ mod tests {
     #[test]
     fn test_build_notification_conversation_updated() {
         let payload: ChatwootWebhookPayload = serde_json::from_str(include_str!("../tests/testdata/chatwoot_conversation_updated.json")).unwrap();
+
+        let notification = SupportClient::build_notification(&Device::mock(), &payload);
+
+        assert!(notification.is_none());
+    }
+
+    #[test]
+    fn test_build_notification_private_message_created() {
+        let payload: ChatwootWebhookPayload =
+            serde_json::from_str(r#"{"event": "message_created", "message_type": "outgoing", "private": true, "content": "internal note"}"#).unwrap();
+
+        let notification = SupportClient::build_notification(&Device::mock(), &payload);
+
+        assert!(notification.is_none());
+    }
+
+    #[test]
+    fn test_build_notification_missing_private_message_created() {
+        let payload: ChatwootWebhookPayload = serde_json::from_str(r#"{"event": "message_created", "message_type": "outgoing", "content": "unknown visibility"}"#).unwrap();
 
         let notification = SupportClient::build_notification(&Device::mock(), &payload);
 

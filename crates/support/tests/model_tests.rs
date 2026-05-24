@@ -13,6 +13,7 @@ fn test_parse_conversation_updated_payload() {
     let message = &messages[0];
     assert_eq!(message.content, Some("Test message".to_string()));
     assert!(!message.is_incoming());
+    assert_eq!(message.private, Some(false));
 
     let sender = message.sender.as_ref().unwrap();
     assert!(sender.custom_attributes.is_none());
@@ -33,12 +34,14 @@ fn test_parse_message_created_payload() {
     assert_eq!(payload.get_device_id(), Some("test-device-id".to_string()));
     assert_eq!(payload.get_unread(), Some(1));
     assert!(payload.is_outgoing_message());
+    assert!(payload.is_public_outgoing_message());
 
     let messages = payload.get_messages();
     assert_eq!(messages.len(), 1);
 
     let message = &messages[0];
     assert!(!message.is_incoming());
+    assert_eq!(message.private, Some(false));
 }
 
 #[test]
@@ -75,6 +78,21 @@ fn test_is_incoming_message() {
 
     let payload: ChatwootWebhookPayload = serde_json::from_str(r#"{"event": "message_created"}"#).unwrap();
     assert!(!payload.is_incoming_message());
+}
+
+#[test]
+fn test_is_public_outgoing_message() {
+    let payload: ChatwootWebhookPayload = serde_json::from_str(r#"{"event": "message_created", "message_type": "outgoing", "private": false}"#).unwrap();
+    assert!(payload.is_public_outgoing_message());
+
+    let payload: ChatwootWebhookPayload = serde_json::from_str(r#"{"event": "message_created", "message_type": "outgoing", "private": true}"#).unwrap();
+    assert!(!payload.is_public_outgoing_message());
+
+    let payload: ChatwootWebhookPayload = serde_json::from_str(r#"{"event": "message_created", "message_type": "incoming", "private": false}"#).unwrap();
+    assert!(!payload.is_public_outgoing_message());
+
+    let payload: ChatwootWebhookPayload = serde_json::from_str(r#"{"event": "message_created", "message_type": "outgoing"}"#).unwrap();
+    assert!(!payload.is_public_outgoing_message());
 }
 
 #[test]
