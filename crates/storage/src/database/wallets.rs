@@ -8,6 +8,7 @@ use primitives::Chain;
 
 pub trait WalletsStore {
     fn get_wallet(&mut self, identifier: &str) -> Result<WalletRow, diesel::result::Error>;
+    fn get_wallet_by_device_and_identifier(&mut self, device_id: i32, identifier: &str) -> Result<WalletRow, diesel::result::Error>;
     fn get_wallet_by_id(&mut self, id: i32) -> Result<WalletRow, diesel::result::Error>;
     fn get_wallets(&mut self, identifiers: Vec<String>) -> Result<Vec<WalletRow>, diesel::result::Error>;
     fn create_wallet(&mut self, wallet: NewWalletRow) -> Result<WalletRow, diesel::result::Error>;
@@ -42,6 +43,15 @@ impl WalletsStore for DatabaseClient {
     fn get_wallet(&mut self, identifier: &str) -> Result<WalletRow, diesel::result::Error> {
         wallets::table
             .filter(wallets::identifier.eq(identifier))
+            .select(WalletRow::as_select())
+            .first(&mut self.connection)
+    }
+
+    fn get_wallet_by_device_and_identifier(&mut self, device_id: i32, identifier: &str) -> Result<WalletRow, diesel::result::Error> {
+        wallets::table
+            .inner_join(wallets_subscriptions::table.on(wallets_subscriptions::wallet_id.eq(wallets::id)))
+            .filter(wallets::identifier.eq(identifier))
+            .filter(wallets_subscriptions::device_id.eq(device_id))
             .select(WalletRow::as_select())
             .first(&mut self.connection)
     }

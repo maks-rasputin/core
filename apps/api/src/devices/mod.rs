@@ -193,6 +193,10 @@ pub async fn redeem_device_rewards_v2(
     request: WalletSigned<RedemptionRequest>,
     client: &State<Mutex<RewardsRedemptionClient>>,
 ) -> Result<ApiResponse<RedemptionResult>, ApiError> {
+    if !request.matches_multicoin_wallet(&device.wallet_identifier) {
+        return Err(ApiError::BadRequest("Wallet signature mismatch".to_string()));
+    }
+
     Ok(client
         .lock()
         .await

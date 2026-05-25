@@ -1,7 +1,7 @@
 use crate::responders::cache_error;
 use gem_auth::{AuthClient, verify_auth_signature};
 use gem_hash::sha2::sha256;
-use primitives::{AuthMessage, AuthenticatedRequest};
+use primitives::{AuthMessage, AuthenticatedRequest, WalletId};
 use rocket::data::{FromData, Outcome, ToByteUnit};
 use rocket::http::Status;
 use rocket::outcome::Outcome::{Error, Success};
@@ -67,9 +67,19 @@ async fn verify_wallet_signature<'r, T: DeserializeOwned + Send, O>(req: &'r Req
     })
 }
 
+// Auth layering principles:
+// Device guards verify the request/device signature and database scope.
+// WalletSigned verifies wallet ownership of the signed JSON body using an auth nonce.
+// Routes that mutate wallet-owned reward state should require both and bind the signed wallet to the resolved wallet.
 pub struct WalletSigned<T> {
     pub address: String,
     pub data: T,
+}
+
+impl<T> WalletSigned<T> {
+    pub fn matches_multicoin_wallet(&self, wallet_id: &WalletId) -> bool {
+        WalletId::Multicoin(self.address.clone()) == *wallet_id
+    }
 }
 
 #[rocket::async_trait]
@@ -86,5 +96,30 @@ impl<'r, T: DeserializeOwned + Send> FromData<'r> for WalletSigned<T> {
             address: verified.address,
             data: verified.data,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::WalletSigned;
+    use primitives::{Chain, WalletId};
+
+    const ADDRESS: &str = "0x1111111111111111111111111111111111111111";
+    const OTHER_ADDRESS: &str = "0x2222222222222222222222222222222222222222";
+
+    fn signed_wallet(address: &str) -> WalletSigned<()> {
+        WalletSigned {
+            address: address.to_string(),
+            data: (),
+        }
+    }
+
+    #[test]
+    fn test_matches_multicoin_wallet() {
+        let request = signed_wallet(ADDRESS);
+
+        assert!(request.matches_multicoin_wallet(&WalletId::Multicoin(ADDRESS.to_string())));
+        assert!(!request.matches_multicoin_wallet(&WalletId::Multicoin(OTHER_ADDRESS.to_string())));
+        assert!(!request.matches_multicoin_wallet(&WalletId::Single(Chain::Ethereum, ADDRESS.to_string())));
     }
 }

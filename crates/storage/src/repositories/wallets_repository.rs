@@ -7,6 +7,7 @@ use std::collections::{HashMap, HashSet};
 
 pub trait WalletsRepository {
     fn get_wallet(&mut self, identifier: &str) -> Result<WalletRow, DatabaseError>;
+    fn get_wallet_by_device_and_identifier(&mut self, device_id: i32, identifier: &str) -> Result<WalletRow, DatabaseError>;
     fn get_wallet_by_id(&mut self, id: i32) -> Result<WalletRow, DatabaseError>;
     fn get_wallets(&mut self, identifiers: Vec<String>) -> Result<Vec<WalletRow>, DatabaseError>;
     fn create_wallets(&mut self, wallets: Vec<NewWalletRow>) -> Result<usize, DatabaseError>;
@@ -30,6 +31,10 @@ pub trait WalletsRepository {
 impl WalletsRepository for DatabaseClient {
     fn get_wallet(&mut self, identifier: &str) -> Result<WalletRow, DatabaseError> {
         WalletsStore::get_wallet(self, identifier).or_not_found(identifier.to_string())
+    }
+
+    fn get_wallet_by_device_and_identifier(&mut self, device_id: i32, identifier: &str) -> Result<WalletRow, DatabaseError> {
+        WalletsStore::get_wallet_by_device_and_identifier(self, device_id, identifier).or_not_found(identifier.to_string())
     }
 
     fn get_wallet_by_id(&mut self, id: i32) -> Result<WalletRow, DatabaseError> {
