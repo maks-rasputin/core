@@ -24,7 +24,8 @@ pub fn calculate_transfer_fee_rate(
         let activation_fee = get_chain_parameter_value(chain_parameters, GET_CREATE_NEW_ACCOUNT_FEE_IN_SYSTEM_CONTRACT)?;
         let new_account_bandwidth_fee = get_chain_parameter_value(chain_parameters, GET_CREATE_ACCOUNT_FEE)?;
 
-        if account_usage.available_bandwidth() >= DEFAULT_BANDWIDTH_BYTES {
+        // Account activation only waives this fixed bandwidth fee when the sender has staked/delegated bandwidth.
+        if account_usage.available_staked_bandwidth() >= DEFAULT_BANDWIDTH_BYTES {
             activation_fee
         } else {
             activation_fee + new_account_bandwidth_fee
@@ -166,8 +167,11 @@ pub fn map_stake_data(account: &TronAccount, stake_type: &StakeType, raw_amount:
 impl TronAccountUsage {
     pub fn available_bandwidth(&self) -> u64 {
         let free = self.free_net_limit.saturating_sub(self.free_net_used);
-        let staked = self.net_limit.saturating_sub(self.net_used);
-        free.saturating_add(staked)
+        free.saturating_add(self.available_staked_bandwidth())
+    }
+
+    pub fn available_staked_bandwidth(&self) -> u64 {
+        self.net_limit.saturating_sub(self.net_used)
     }
 
     pub fn missing_bandwidth(&self, required: u64) -> u64 {
@@ -226,6 +230,7 @@ mod tests {
         };
 
         assert_eq!(usage.available_bandwidth(), 1200); // (1000-100) + (500-200)
+        assert_eq!(usage.available_staked_bandwidth(), 300);
         assert_eq!(usage.missing_bandwidth(1500), 300);
         assert_eq!(usage.missing_bandwidth(1000), 0);
     }
@@ -328,9 +333,15 @@ mod tests {
             BigInt::from(2_100_000), // activation + bandwidth + memo
         );
 
-        let with_bandwidth = account_usage(DEFAULT_BANDWIDTH_BYTES, 0, 0);
+        let with_free_bandwidth = account_usage(DEFAULT_BANDWIDTH_BYTES, 0, 0);
         assert_eq!(
-            calculate_transfer_fee_rate(&params, &with_bandwidth, true, false).unwrap(),
+            calculate_transfer_fee_rate(&params, &with_free_bandwidth, true, false).unwrap(),
+            BigInt::from(1_100_000), // activation + fixed account creation bandwidth fee
+        );
+
+        let with_staked_bandwidth = account_usage(0, DEFAULT_BANDWIDTH_BYTES, 0);
+        assert_eq!(
+            calculate_transfer_fee_rate(&params, &with_staked_bandwidth, true, false).unwrap(),
             BigInt::from(1_000_000), // only activation
         );
     }
