@@ -144,14 +144,6 @@ where
         })
     }
 
-    fn parse_amount(value: &str, field: &str) -> Result<String, SwapperError> {
-        if value.is_empty() {
-            Err(SwapperError::ComputeQuoteError(format!("Missing {field} in Near Intents response")))
-        } else {
-            Ok(value.to_string())
-        }
-    }
-
     fn map_transaction_status(status: &str) -> SwapStatus {
         match status {
             "SWAP_COMPLETED" | "SWAP_COMPLETED_TX" | "SUCCESS" => SwapStatus::Completed,
@@ -290,13 +282,15 @@ where
         let quote_request = Self::build_quote_request(request, SwapType::FlexInput, true)?;
         let amount = quote_request.amount.clone();
         let response = Self::extract_quote(self.client.fetch_quote(&quote_request).await?, request.from_asset.decimals)?;
-        let amount_out = Self::parse_amount(&response.quote.amount_out, "amountOut")?;
 
         let eta = response.quote.time_estimate;
+        let min_amount_in = response.quote.min_amount_in.to_string();
+        let amount_out = response.quote.amount_out.to_string();
         let route_data = serde_json::to_string(&quote_request)?;
 
         Ok(Quote {
             from_value: amount,
+            min_from_value: Some(min_amount_in),
             to_value: amount_out,
             data: ProviderData {
                 provider: self.provider.clone(),
@@ -327,7 +321,7 @@ where
         let deposit_address = near_quote
             .deposit_address
             .ok_or_else(|| SwapperError::ComputeQuoteError("Missing depositAddress in Near Intents response".into()))?;
-        let amount_in = Self::parse_amount(&near_quote.amount_in, "amountIn")?;
+        let amount_in = near_quote.amount_in.to_string();
         let deposit_mode = near_quote
             .deposit_mode
             .or(Some(request_deposit_mode))

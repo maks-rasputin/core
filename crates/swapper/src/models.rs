@@ -87,6 +87,7 @@ impl Default for Options {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Quote {
     pub from_value: String,
+    pub min_from_value: Option<String>,
     pub to_value: String,
     pub data: ProviderData,
     pub request: QuoteRequest,

@@ -78,6 +78,8 @@ pub struct SwapData {
 pub struct SwapQuote {
     pub from_address: String,
     pub from_value: String,
+    #[serde(default)]
+    pub min_from_value: Option<String>,
     pub to_address: String,
     pub to_value: String,
     pub provider_data: SwapProviderData,

@@ -54,6 +54,7 @@ impl Swapper for CetusClmm {
 
         Ok(Quote {
             from_value,
+            min_from_value: None,
             to_value: route.net_amount_out().to_string(),
             data: ProviderData {
                 provider: self.provider().clone(),

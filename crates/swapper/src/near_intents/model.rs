@@ -1,4 +1,6 @@
+use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
+use serde_serializers::deserialize_biguint_from_str;
 
 pub const DEPOSIT_TYPE_ORIGIN: &str = "ORIGIN_CHAIN";
 pub const RECIPIENT_TYPE_DESTINATION: &str = "DESTINATION_CHAIN";
@@ -73,12 +75,16 @@ pub struct Quote {
     pub deposit_address: Option<String>,
     pub deposit_memo: Option<String>,
     pub deposit_mode: Option<DepositMode>,
-    pub amount_in: String,
+    #[serde(deserialize_with = "deserialize_biguint_from_str")]
+    pub amount_in: BigUint,
     pub amount_in_formatted: String,
-    pub min_amount_in: String,
-    pub amount_out: String,
+    #[serde(deserialize_with = "deserialize_biguint_from_str")]
+    pub min_amount_in: BigUint,
+    #[serde(deserialize_with = "deserialize_biguint_from_str")]
+    pub amount_out: BigUint,
     pub amount_out_formatted: String,
-    pub min_amount_out: String,
+    #[serde(deserialize_with = "deserialize_biguint_from_str")]
+    pub min_amount_out: BigUint,
     pub deadline: Option<String>,
     pub time_when_inactive: Option<String>,
     pub time_estimate: u32,

@@ -166,6 +166,7 @@ where
 
         Ok(Quote {
             from_value: request.value.clone(),
+            min_from_value: None,
             to_value: quote.output_value.clone(),
             data: ProviderData {
                 provider: self.provider().clone(),

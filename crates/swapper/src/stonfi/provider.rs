@@ -422,6 +422,7 @@ where
 
         Ok(Quote {
             from_value,
+            min_from_value: None,
             to_value: path.to_value,
             data: ProviderData {
                 provider: self.provider().clone(),

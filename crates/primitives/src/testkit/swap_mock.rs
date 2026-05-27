@@ -97,6 +97,7 @@ impl SwapQuote {
     pub fn mock() -> Self {
         SwapQuote {
             from_value: "1000000000".to_string(),
+            min_from_value: None,
             to_value: "1000000".to_string(),
             provider_data: SwapProviderData::mock(),
             from_address: TEST_EVM_RECIPIENT.to_string(),
@@ -114,6 +115,7 @@ impl SwapQuote {
     pub fn mock_with_values(provider: SwapProvider, from_value: &str, to_value: &str) -> Self {
         SwapQuote {
             from_value: from_value.to_string(),
+            min_from_value: None,
             to_value: to_value.to_string(),
             provider_data: SwapProviderData::mock_with_provider(provider),
             from_address: TEST_EVM_RECIPIENT.to_string(),

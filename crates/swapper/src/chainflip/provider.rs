@@ -203,6 +203,7 @@ where
 
         Ok(Quote {
             from_value,
+            min_from_value: None,
             to_value: egress_amount.to_string(),
             data: ProviderData {
                 provider: self.provider.clone(),

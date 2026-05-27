@@ -76,6 +76,7 @@ where
 
         Ok(Quote {
             from_value,
+            min_from_value: None,
             to_value: BigNumberFormatter::value_from_amount(&quote.to_token_amount, response.to_token.decimals)?,
             data: ProviderData {
                 provider: self.provider().clone(),

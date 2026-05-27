@@ -263,6 +263,7 @@ mod tests {
                     quote: primitives::swap::SwapQuote {
                         from_address: SENDER.to_string(),
                         from_value: "2000000".to_string(),
+                        min_from_value: None,
                         to_address: "TW1dU4L3eNm7Lw8WvieLKEHpXWAussRG9Z".to_string(),
                         to_value: "1".to_string(),
                         provider_data: primitives::swap::SwapProviderData {

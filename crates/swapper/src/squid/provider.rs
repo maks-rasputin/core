@@ -116,6 +116,7 @@ where
 
         Ok(Quote {
             from_value,
+            min_from_value: None,
             to_value: response.route.estimate.to_amount,
             data: ProviderData {
                 provider: self.provider().clone(),

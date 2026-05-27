@@ -489,6 +489,7 @@ impl Swapper for Across {
 
         Ok(Quote {
             from_value: request.value.clone(),
+            min_from_value: None,
             to_value: to_value.to_string(),
             data: ProviderData {
                 provider: self.provider().clone(),

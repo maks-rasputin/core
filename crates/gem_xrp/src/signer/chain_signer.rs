@@ -230,6 +230,7 @@ mod tests {
                     quote: SwapQuote {
                         from_address: "rfxdLwsZnoespnTDDb1Xhvbc8EFNdztaoq".to_string(),
                         from_value: "10".to_string(),
+                        min_from_value: None,
                         to_address: "rU893viamSnsfP3zjzM2KPxjqZjXSXK6VF".to_string(),
                         to_value: "1".to_string(),
                         provider_data: SwapProviderData {

@@ -34,6 +34,7 @@ pub struct GemSwapData {
 pub struct GemSwapQuote {
     pub from_address: String,
     pub from_value: String,
+    pub min_from_value: Option<String>,
     pub to_address: String,
     pub to_value: String,
     pub provider_data: GemSwapProviderData,

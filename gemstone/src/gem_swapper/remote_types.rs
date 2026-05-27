@@ -97,6 +97,7 @@ pub struct SwapperProviderData {
 #[uniffi::remote(Record)]
 pub struct SwapperQuote {
     pub from_value: String,
+    pub min_from_value: Option<String>,
     pub to_value: String,
     pub data: SwapperProviderData,
     pub request: SwapperQuoteRequest,

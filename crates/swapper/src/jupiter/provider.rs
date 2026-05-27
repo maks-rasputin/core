@@ -137,6 +137,7 @@ where
 
         let quote = Quote {
             from_value: request.value.clone(),
+            min_from_value: None,
             to_value: out_amount.to_string(),
             data: ProviderData {
                 provider: self.provider().clone(),

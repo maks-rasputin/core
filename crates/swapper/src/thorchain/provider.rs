@@ -144,6 +144,7 @@ where
 
         let quote = Quote {
             from_value,
+            min_from_value: None,
             to_value: to_value.to_string(),
             data: ProviderData {
                 provider: self.provider().clone(),
@@ -261,6 +262,7 @@ mod tests {
         };
         let quote = Quote {
             from_value: "10000000".to_string(),
+            min_from_value: None,
             to_value: "1".to_string(),
             data: ProviderData {
                 provider: swapper.provider().clone(),

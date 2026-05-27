@@ -54,6 +54,7 @@ impl Quote {
     pub fn mock(chain: Chain, token_id: Option<&str>) -> Self {
         Quote {
             from_value: "1000000".to_string(),
+            min_from_value: None,
             to_value: "1000000".to_string(),
             data: ProviderData::mock(),
             request: QuoteRequest::mock(chain, token_id),
@@ -64,6 +65,7 @@ impl Quote {
     pub fn mock_with_provider(provider: SwapperProvider, to_value: &str) -> Self {
         Quote {
             from_value: "1000000".to_string(),
+            min_from_value: None,
             to_value: to_value.to_string(),
             data: ProviderData {
                 provider: ProviderType::new(provider),
