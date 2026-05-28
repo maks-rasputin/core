@@ -20,7 +20,7 @@ pub enum StreamEvent {
     PriceAlerts(StreamPriceAlertUpdate),
     Nft(StreamWalletUpdate),
     Perpetual(StreamWalletUpdate),
-    InAppNotification(StreamNotificationlUpdate),
+    InAppNotification(StreamNotificationUpdate),
     FiatTransaction(StreamWalletUpdate),
 }
 
@@ -76,7 +76,7 @@ pub struct StreamWalletUpdate {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[typeshare(swift = "Sendable")]
-pub struct StreamNotificationlUpdate {
+pub struct StreamNotificationUpdate {
     pub wallet_id: WalletId,
     pub notification: InAppNotification,
 }
