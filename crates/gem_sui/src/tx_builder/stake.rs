@@ -6,9 +6,9 @@ use crate::{
 
 use std::{error::Error, str::FromStr};
 use sui_transaction_builder::{Function, ObjectInput, TransactionBuilder};
-use sui_types::{Address, Identifier};
+use sui_types::{Address, Identifier, TypeTag};
 
-use super::{TransactionBuilderInput, finish_transaction};
+use super::{TransactionBuilderInput, finish_transaction, transfer::requires_hybrid_funding};
 
 pub const SUI_REQUEST_ADD_STAKE: &str = "request_add_stake";
 pub const SUI_REQUEST_WITHDRAW_STAKE: &str = "request_withdraw_stake";
@@ -16,6 +16,12 @@ pub const SUI_REQUEST_WITHDRAW_STAKE: &str = "request_withdraw_stake";
 fn build_split_and_stake_ptb(input: &StakeInput) -> Result<TransactionBuilder, Box<dyn Error + Send + Sync>> {
     if let Some(err) = crate::validate_enough_balance(&input.coins, input.stake_amount) {
         return Err(err);
+    }
+    if input.coins.coins.is_empty() {
+        return Err("No SUI coins available for gas".into());
+    }
+    if requires_hybrid_funding(&input.coins, input.stake_amount) {
+        return Err("Sui stake: amount requires combining Address Balance with Coin<SUI> objects, which is not supported".into());
     }
 
     let stake_chain = primitives::StakeChain::Sui;
@@ -27,11 +33,19 @@ fn build_split_and_stake_ptb(input: &StakeInput) -> Result<TransactionBuilder, B
 
     let mut ptb = TransactionBuilder::new();
 
-    // split new coin to stake
-    let stake_amount = ptb.pure(&input.stake_amount);
-    let gas = ptb.gas();
-    let mut split_results = ptb.split_coins(gas, vec![stake_amount]);
-    let split_result = split_results.pop().expect("split_coins should return one argument");
+    let stake_coin = if input.coins.address_balance >= input.stake_amount {
+        let coin_type: TypeTag = input
+            .coins
+            .coin_type
+            .parse()
+            .map_err(|err| format!("invalid Sui native coin type {}: {err}", input.coins.coin_type))?;
+        ptb.funds_withdrawal_coin(coin_type, input.stake_amount)
+    } else {
+        let stake_amount = ptb.pure(&input.stake_amount);
+        let gas = ptb.gas();
+        let mut split_results = ptb.split_coins(gas, vec![stake_amount]);
+        split_results.pop().expect("split_coins should return one argument")
+    };
 
     // move call request_add_stake
     let function = Function::new(
@@ -43,14 +57,14 @@ fn build_split_and_stake_ptb(input: &StakeInput) -> Result<TransactionBuilder, B
     let sys_state = ptb.object(sui_system_state_object_input());
     let validator_argument = ptb.pure(&validator);
 
-    ptb.move_call(function, vec![sys_state, split_result, validator_argument]);
+    ptb.move_call(function, vec![sys_state, stake_coin, validator_argument]);
 
     Ok(ptb)
 }
 
 pub fn encode_split_and_stake(input: &StakeInput) -> Result<TxOutput, Box<dyn Error + Send + Sync>> {
     let ptb = build_split_and_stake_ptb(input)?;
-    let gas_objects = input.coins.iter().map(|x| x.object.to_input()).collect::<Vec<_>>();
+    let gas_objects = input.coins.coins.iter().map(|x| x.object.to_input()).collect::<Vec<_>>();
     finish_transaction(ptb, TransactionBuilderInput::new(input.sender.as_str(), input.gas.price, input.gas.budget, gas_objects))
         .map_err(|err| Box::new(err) as Box<dyn Error + Send + Sync>)
 }
@@ -58,16 +72,8 @@ pub fn encode_split_and_stake(input: &StakeInput) -> Result<TxOutput, Box<dyn Er
 fn build_unstake_ptb(input: &UnstakeInput) -> Result<(TransactionBuilder, ObjectInput), Box<dyn Error + Send + Sync>> {
     let mut ptb = TransactionBuilder::new();
 
-    let staked_sui = ptb.object(ObjectInput::owned(
-        input.staked_sui.object_id.parse().unwrap(),
-        input.staked_sui.version,
-        input.staked_sui.digest.parse().unwrap(),
-    ));
-    let gas_coin = ObjectInput::owned(
-        input.gas_coin.object.object_id.parse().unwrap(),
-        input.gas_coin.object.version,
-        input.gas_coin.object.digest.parse().unwrap(),
-    );
+    let staked_sui = ptb.object(input.staked_sui.to_input());
+    let gas_coin = input.gas_coin.to_input();
     let function = Function::new(
         ObjectId::from(SUI_SYSTEM_PACKAGE_ID).into(),
         Identifier::new(SUI_SYSTEM_ID).unwrap(),
@@ -92,7 +98,7 @@ mod tests {
     use super::*;
     use crate::{
         SUI_COIN_TYPE,
-        models::{Coin, Gas, Object},
+        models::{Coin, Gas, Object, OwnedCoins},
         tx_builder::decode_transaction,
     };
     use gem_encoding::encode_base64;
@@ -105,15 +111,19 @@ mod tests {
             validator: "0x61953ea72709eed72f4441dd944eec49a11b4acabfc8e04015e89c63be81b6ab".into(),
             stake_amount: 1_000_000_000,
             gas: Gas { budget: 20_000_000, price: 750 },
-            coins: vec![Coin {
-                coin_type: SUI_COIN_TYPE.into(),
-                balance: 10990277896,
-                object: Object {
-                    object_id: "0x36b8380aa7531d73723657d73a114cfafedf89dc8c76b6752f6daef17e43dda2".into(),
-                    version: 0x3f4d8e5,
-                    digest: "HdfF7hswRuvbXbEXjGjmUCt7gLybhvbPvvK8zZbCqyD8".into(),
-                },
-            }],
+            coins: OwnedCoins::new(
+                SUI_COIN_TYPE.into(),
+                vec![Coin {
+                    coin_type: SUI_COIN_TYPE.into(),
+                    balance: 10990277896,
+                    object: Object {
+                        object_id: "0x36b8380aa7531d73723657d73a114cfafedf89dc8c76b6752f6daef17e43dda2".parse().unwrap(),
+                        version: 0x3f4d8e5,
+                        digest: "HdfF7hswRuvbXbEXjGjmUCt7gLybhvbPvvK8zZbCqyD8".parse().unwrap(),
+                    },
+                }],
+                0,
+            ),
         };
         let data = encode_split_and_stake(&input).unwrap();
         let tx: Transaction = bcs::from_bytes(&data.tx_data).unwrap();
@@ -135,8 +145,8 @@ mod tests {
         let input = UnstakeInput {
             sender: "0xe6af80fe1b0b42fcd96762e5c70f5e8dae39f8f0ee0f118cac0d55b74e2927c2".into(),
             staked_sui: Object {
-                object_id: "0xc8c1666ae68f46b609d40bb51d1ec23dc2e0560f986aae878643b6d215549fcf".into(),
-                digest: "CU86BjXRF1XHFRjKBasCYEuaQxhHuyGBpuoJyqsrYoX5".into(),
+                object_id: "0xc8c1666ae68f46b609d40bb51d1ec23dc2e0560f986aae878643b6d215549fcf".parse().unwrap(),
+                digest: "CU86BjXRF1XHFRjKBasCYEuaQxhHuyGBpuoJyqsrYoX5".parse().unwrap(),
                 version: 64195796,
             },
             gas: Gas { budget: 25_000_000, price: 750 },
@@ -144,9 +154,9 @@ mod tests {
                 coin_type: SUI_COIN_TYPE.into(),
                 balance: 631668351,
                 object: Object {
-                    object_id: "0x36b8380aa7531d73723657d73a114cfafedf89dc8c76b6752f6daef17e43dda2".into(),
+                    object_id: "0x36b8380aa7531d73723657d73a114cfafedf89dc8c76b6752f6daef17e43dda2".parse().unwrap(),
                     version: 68755407,
-                    digest: "FHbvG5i7f8o2VrKpXnqGFHNvGxG7BBKREea5avdPN7ke".into(),
+                    digest: "FHbvG5i7f8o2VrKpXnqGFHNvGxG7BBKREea5avdPN7ke".parse().unwrap(),
                 },
             },
         };
