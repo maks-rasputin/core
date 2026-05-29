@@ -1,4 +1,4 @@
-use gem_encoding::protobuf::proto_encode;
+use gem_encoding::protobuf::{proto_decode, proto_encode};
 use sui_types as sdk;
 
 use super::{Command, Input};
@@ -40,6 +40,10 @@ proto_encode!(Transaction {
     5 => sender: optional_string,
 });
 
+proto_decode!(Transaction {
+    4 => kind: optional_message,
+});
+
 #[derive(Clone, Debug, Default)]
 pub struct TransactionKind {
     pub kind: Option<i32>,
@@ -74,6 +78,10 @@ proto_encode!(TransactionKind {
     2 => programmable_transaction: optional_message,
 });
 
+proto_decode!(TransactionKind {
+    2 => programmable_transaction: optional_message,
+});
+
 #[derive(Clone, Debug, Default)]
 pub struct ProgrammableTransaction {
     pub inputs: Vec<Input>,
@@ -91,5 +99,9 @@ impl ProgrammableTransaction {
 
 proto_encode!(ProgrammableTransaction {
     1 => inputs: repeated_message,
+    2 => commands: repeated_message,
+});
+
+proto_decode!(ProgrammableTransaction {
     2 => commands: repeated_message,
 });

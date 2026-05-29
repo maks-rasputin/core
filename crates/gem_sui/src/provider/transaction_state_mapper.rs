@@ -33,6 +33,7 @@ mod tests {
                     owner: Owner::String("0x123".to_string()),
                 },
             },
+            move_call_packages: Vec::new(),
             balance_changes: None,
             events: vec![],
             timestamp_ms: 1234567890,

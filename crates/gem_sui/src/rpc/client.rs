@@ -23,6 +23,7 @@ use crate::{SUI_COIN_TYPE, SUI_COIN_TYPE_FULL};
 
 const TRANSACTION_READ_MASK: &[&str] = &[
     "digest",
+    "transaction.kind",
     "effects.gas_used",
     "effects.status",
     "effects.gas_object",

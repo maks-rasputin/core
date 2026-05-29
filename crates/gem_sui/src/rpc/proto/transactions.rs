@@ -154,6 +154,7 @@ proto_decode!(CommandOutput {
 #[derive(Clone, Debug, Default)]
 pub struct ExecutedTransaction {
     pub digest: Option<String>,
+    pub transaction: Option<Transaction>,
     pub effects: Option<TransactionEffects>,
     pub events: Option<TransactionEvents>,
     pub timestamp: Option<Timestamp>,
@@ -162,6 +163,7 @@ pub struct ExecutedTransaction {
 
 proto_decode!(ExecutedTransaction {
     1 => digest: optional_string,
+    2 => transaction: optional_message,
     4 => effects: optional_message,
     5 => events: optional_message,
     7 => timestamp: optional_message,

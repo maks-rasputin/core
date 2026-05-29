@@ -2,7 +2,7 @@ use std::{error::Error, str::FromStr};
 
 use num_bigint::{BigInt, BigUint};
 
-use super::proto::{self, OwnerKind, Timestamp};
+use super::proto::{self, Command, OwnerKind, Timestamp};
 use crate::models::transaction::SuiStatus;
 use crate::models::{
     BalanceChange, Checkpoint, Digest, Effect, Event, GasObject, GasUsed, InspectCommandResult, InspectEffects, InspectGasUsed, InspectResult, Owner, OwnerObject, Status,
@@ -37,10 +37,34 @@ pub(super) fn map_executed_transaction(transaction: proto::ExecutedTransaction) 
     Ok(Digest {
         digest: transaction.digest.ok_or("missing Sui transaction digest")?,
         effects: map_effect(transaction.effects.as_ref()),
+        move_call_packages: map_move_call_packages(transaction.transaction.as_ref()),
         balance_changes: Some(transaction.balance_changes.into_iter().map(map_balance_change).collect::<Result<Vec<_>, _>>()?),
         events: transaction.events.map(map_events).unwrap_or_default(),
         timestamp_ms: transaction.timestamp.as_ref().map(timestamp_millis).unwrap_or_default() as u64,
     })
+}
+
+fn map_move_call_packages(transaction: Option<&proto::Transaction>) -> Vec<String> {
+    transaction
+        .and_then(|transaction| transaction.kind.as_ref())
+        .and_then(|kind| kind.programmable_transaction.as_ref())
+        .map(|transaction| {
+            transaction
+                .commands
+                .iter()
+                .filter_map(|command| match command {
+                    Command::MoveCall(call) => call.package.clone(),
+                    Command::TransferObjects(_)
+                    | Command::SplitCoins(_)
+                    | Command::MergeCoins(_)
+                    | Command::Publish(_)
+                    | Command::MakeMoveVector(_)
+                    | Command::Upgrade(_)
+                    | Command::Unknown => None,
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 fn map_effect(effects: Option<&proto::TransactionEffects>) -> Effect {

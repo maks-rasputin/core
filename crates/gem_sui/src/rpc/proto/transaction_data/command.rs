@@ -1,4 +1,4 @@
-use gem_encoding::protobuf::{encode_message_field, proto_encode};
+use gem_encoding::protobuf::{encode_message_field, proto_decode, proto_encode};
 use sui_types as sdk;
 
 use super::Argument;
@@ -7,7 +7,7 @@ use crate::rpc::proto::MessageResult;
 // Field numbers mirror sui-rpc v0.3.1 transaction command schemas:
 // https://docs.rs/crate/sui-rpc/0.3.1/source/vendored/proto/sui/rpc/v2/transaction.proto
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub enum Command {
     MoveCall(MoveCall),
     TransferObjects(TransferObjects),
@@ -16,6 +16,8 @@ pub enum Command {
     Publish(Publish),
     MakeMoveVector(MakeMoveVector),
     Upgrade(Upgrade),
+    #[default]
+    Unknown,
 }
 
 impl Command {
@@ -48,7 +50,12 @@ proto_encode!(Command as value {
         Command::Publish(value) => encode_message_field(5, &value.encode()),
         Command::MakeMoveVector(value) => encode_message_field(6, &value.encode()),
         Command::Upgrade(value) => encode_message_field(7, &value.encode()),
+        Command::Unknown => Vec::new(),
     },
+});
+
+proto_decode!(Command {
+    1 => |value, field| *value = Self::MoveCall(field.message()?),
 });
 
 #[derive(Clone, Debug, Default)]
@@ -88,6 +95,10 @@ proto_encode!(MoveCall {
     3 => function: optional_string,
     4 => type_arguments: repeated_string,
     5 => arguments: repeated_message,
+});
+
+proto_decode!(MoveCall {
+    1 => package: optional_string,
 });
 
 #[derive(Clone, Debug, Default)]

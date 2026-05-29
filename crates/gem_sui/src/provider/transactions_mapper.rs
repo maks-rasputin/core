@@ -1,5 +1,5 @@
 use crate::models::{BalanceChange, Digest, Event, EventStake, EventUnstake, GasUsed, TransactionBlocks};
-use crate::{SUI_COIN_TYPE, SUI_STAKE_EVENT, SUI_UNSTAKE_EVENT, full_coin_type};
+use crate::{SUI_COIN_TYPE, SUI_STAKE_EVENT, SUI_UNSTAKE_EVENT, full_coin_type, sui_framework_package_address};
 use chain_primitives::{BalanceDiff, SwapMapper};
 use chrono::{TimeZone, Utc};
 use num_bigint::{BigUint, Sign};
@@ -33,7 +33,7 @@ pub fn map_transaction(transaction: Digest) -> Option<Transaction> {
     };
     let owner = effects.gas_object.owner.get_address_owner();
 
-    let (asset_id, from, to, transaction_type, value, metadata) = map_transaction_type(&transaction.events, &balance_changes, &owner, &fee)?;
+    let (asset_id, from, to, transaction_type, value, metadata) = map_transaction_type(&transaction.events, &transaction.move_call_packages, &balance_changes, &owner, &fee)?;
 
     Some(Transaction::new(
         hash,
@@ -54,6 +54,7 @@ pub fn map_transaction(transaction: Digest) -> Option<Transaction> {
 
 fn map_transaction_type(
     events: &[Event],
+    move_call_packages: &[String],
     balance_changes: &[BalanceChange],
     owner: &Option<String>,
     fee: &BigUint,
@@ -135,10 +136,11 @@ fn map_transaction_type(
         let method_name = events.first()?.event_type.rsplit("::").nth(1)?.to_string();
         let metadata = TransactionSmartContractMetadata { method_name };
         let owner = owner.clone()?;
+        let contract = primary_contract(move_call_packages.iter().map(String::as_str)).or_else(|| primary_contract(events.iter().map(|event| event.package_id.as_str())));
         return Some((
             chain.as_asset_id(),
             owner.clone(),
-            owner,
+            contract.unwrap_or(owner),
             TransactionType::SmartContractCall,
             "0".to_string(),
             serde_json::to_value(metadata).ok(),
@@ -146,6 +148,26 @@ fn map_transaction_type(
     }
 
     None
+}
+
+fn primary_contract<'a>(contracts: impl IntoIterator<Item = &'a str>) -> Option<String> {
+    let mut first = None;
+    for contract in contracts {
+        if contract.is_empty() {
+            continue;
+        }
+        if first.is_none() {
+            first = Some(contract);
+        }
+        if !is_sui_framework_package(contract) {
+            return Some(contract.to_string());
+        }
+    }
+    first.map(ToString::to_string)
+}
+
+fn is_sui_framework_package(package: &str) -> bool {
+    package.parse::<sui_types::Address>().is_ok_and(|address| address == sui_framework_package_address())
 }
 
 fn map_transfer_balance_changes<'a>(balance_changes: &'a [BalanceChange], fee: &BigUint) -> Option<(&'a BalanceChange, &'a BalanceChange)> {
@@ -273,6 +295,7 @@ mod tests {
                 status: Status { status: "success".to_string() },
                 gas_object: GasObject { owner: owner(OWNER_ADDRESS) },
             },
+            move_call_packages: Vec::new(),
             balance_changes: Some(balance_changes),
             events,
             timestamp_ms: 1778964551487,
@@ -296,6 +319,18 @@ mod tests {
 
         let metadata: TransactionSmartContractMetadata = serde_json::from_value(transaction.metadata.unwrap()).unwrap();
         assert_eq!(metadata.method_name, "timevy_tipping");
+    }
+
+    #[test]
+    fn test_map_mayan_mctp_smart_contract_call() {
+        let digest: Digest = serde_json::from_str(include_str!("../../testdata/mayan_mctp_sui_usdc_to_arbitrum_usdc.json")).unwrap();
+        let expected_contract = primary_contract(digest.move_call_packages.iter().map(String::as_str)).unwrap();
+        let transaction = map_transaction(digest).unwrap();
+
+        assert_eq!(transaction.hash, "AqXACRuimqMVf4wiVjR3Ch5PBunhQAJY3ZfAMF3MXUsW");
+        assert_eq!(transaction.transaction_type, TransactionType::SmartContractCall);
+        assert_eq!(transaction.from, "0x1b4cd8b734f2465614678ca0450ce9c4f2ff4835c6a7545522892a1a8fb67991");
+        assert_eq!(transaction.to, expected_contract);
     }
 
     #[test]

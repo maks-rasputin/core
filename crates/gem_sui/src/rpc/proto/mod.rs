@@ -25,7 +25,7 @@ pub(crate) use objects::{
 pub(crate) use service::{Epoch, GetEpochRequest, GetEpochResponse, GetServiceInfoRequest, GetServiceInfoResponse};
 pub(crate) use status::Status;
 pub(crate) use timestamp::Timestamp;
-pub(crate) use transaction_data::{Argument, Input, MoveCall, ProgrammableTransaction, Transaction, TransactionKind, UserSignature};
+pub(crate) use transaction_data::{Argument, Command, Input, MoveCall, ProgrammableTransaction, Transaction, TransactionKind, UserSignature};
 pub(crate) use transactions::{
     BalanceChange, BatchGetTransactionsRequest, BatchGetTransactionsResponse, ExecuteTransactionRequest, ExecuteTransactionResponse, ExecutedTransaction, GasCostSummary,
     GetTransactionRequest, GetTransactionResponse, GetTransactionResult, SimulateTransactionRequest, SimulateTransactionResponse, TransactionChecks, TransactionEffects,

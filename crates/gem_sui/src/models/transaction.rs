@@ -87,6 +87,8 @@ pub struct Checkpoint {
 pub struct Digest {
     pub digest: String,
     pub effects: Effect,
+    #[serde(default)]
+    pub move_call_packages: Vec<String>,
     #[serde(rename = "balanceChanges")]
     pub balance_changes: Option<Vec<BalanceChange>>,
     pub events: Vec<Event>,
